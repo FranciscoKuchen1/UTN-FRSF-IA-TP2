@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+
+  backend:
+    build: .
+    container_name: utn_frsf_ia_tp2_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env 10
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: utn_frsf_ia_tp2_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: utn_frsf_ia_tp2_frontend
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis_data:
