@@ -1,0 +1,69 @@
+IMPUESTO AL VALOR AGREGADO (IVA) - NORMATIVA 2026
+
+CONCEPTO GENERAL:
+El IVA es un impuesto al consumo que se aplica en cada etapa de la cadena de producción y comercialización. El responsable retiene el impuesto y lo traslada al consumidor final.
+
+ALÍCUOTAS VIGENTES 2026:
+- Alícuota general: 21%
+- Alícuota reducida: 10.5% (para ciertos bienes básicos)
+- Alícuota diferenciada: 27% (para servicios de telefonía, energía eléctrica y combustibles - desde 2022)
+- Exento: 0% (servicios financieros, seguros, salud, educación, etc.)
+- No gravado: transacciones internacionales, exportaciones
+
+OPERACIONES GRAVADAS:
+- Venta de bienes
+- Prestación de servicios
+- Importaciones de bienes
+
+OPERACIONES EXENTAS:
+- Servicios de salud prestados por profesionales y establecimientos de salud
+- Servicios educativos impartidos por establecimientos de enseñanza
+- Seguros y servicios relacionados
+- Servicios financieros
+- Arrendamiento de inmuebles
+
+OPERACIONES NO GRAVADAS:
+- Exportación de bienes
+- Servicios prestados al exterior
+- Venta de divisas
+- Operaciones de bolsa y mercado de capitales
+
+RÉGIMEN DE RESPONSABLES INSCRITOS:
+- Período fiscal: Mes calendario
+- Declaración Jurada: Antes del 17/18 del mes siguiente
+- Pago: Junto con la presentación de DDJJ
+- Saldo deudor: Se debe pagar IVA
+- Saldo acreedor: Se puede solicitar reintegro o compensación
+
+CRÉDITO FISCAL:
+El responsable puede deducir del IVA que debe pagar, el IVA de sus compras de bienes y servicios destinados a operaciones gravadas. Requisitos:
+- Comprobante fiscal válido
+- Bien o servicio debe estar destinado a operaciones gravadas
+- Comprobante debe estar a nombre del responsable
+
+PROHIBICIONES EN CRÉDITO FISCAL:
+- Bienes de consumo personal
+- Bienes no destinados a la actividad
+- Servicios personales
+- Combustible para vehículos de uso personal
+- Comidas y bebidas (con excepciones para empresas de restauración)
+
+IVA SOPORTADO Y IVA REPERCUTIDO:
+- IVA Soportado: IVA pagado por las compras
+- IVA Repercutido: IVA cobrado por las ventas
+- Resultado del período: Repercutido - Soportado
+
+RÉGIMEN SIMPLIFICADO:
+Algunos contribuyentes pueden optar por régimen simplificado con alícuota única según categoría de ingresos. No es aplicable a todas las actividades.
+
+SANCIONES POR INCUMPLIMIENTO:
+- Declaración fuera de término: 5% a 50% del impuesto omitido
+- Falta de presentación: Multa fija o porcentual
+- Documentación incompleta: Penalidades
+- Evasión: Delito penal
+
+NOTAS IMPORTANTES:
+- Las PYMES pueden utilizar facturación electrónica
+- Existe obligatoriedad de emisión de comprobantes
+- AFIP controla cumplimiento mediante auditorías
+- Requiere asesoramiento contable especializado

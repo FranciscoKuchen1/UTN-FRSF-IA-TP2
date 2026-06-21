@@ -1,0 +1,64 @@
+import json
+import os
+from typing import Optional
+
+
+class ShortTermMemory:
+    """Historial de la sesión activa. Se incluye completo en cada llamada al LLM."""
+
+    def __init__(self):
+        self.messages: list[dict] = []
+
+    def add(self, role: str, content: str):
+        """role: 'user' | 'assistant' | 'tool'"""
+        self.messages.append({"role": role, "content": content})
+
+    def get_history(self) -> list[dict]:
+        return self.messages.copy()
+
+    def clear(self):
+        self.messages = []
+
+
+class LongTermMemory:
+    """
+    Persiste el perfil básico del cliente entre sesiones.
+
+    Backend configurable vía variable de entorno MEMORY_BACKEND:
+      - "redis"  (default): requiere un servidor Redis corriendo (local, Docker o cloud).
+      - "memory": guarda todo en un diccionario en RAM del proceso.
+                  Sirve para desarrollo local sin instalar/levantar Redis.
+                  ADVERTENCIA: se pierde el perfil del cliente si el backend se reinicia,
+                  y no es apto para producción con múltiples instancias/workers.
+    """
+
+    def __init__(self):
+        self.backend = os.getenv("MEMORY_BACKEND", "redis").lower()
+
+        if self.backend == "redis":
+            import redis
+            self._redis = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+        elif self.backend == "memory":
+            self._store: dict[str, dict] = {}
+        else:
+            raise ValueError(f"MEMORY_BACKEND desconocido: '{self.backend}'. Usar 'redis' o 'memory'.")
+
+    def guardar_perfil(self, cliente_id: str, datos: dict):
+        if self.backend == "redis":
+            key = f"perfil:{cliente_id}"
+            self._redis.setex(key, 86400 * 7, json.dumps(datos))  # TTL: 7 días
+        else:
+            self._store[cliente_id] = datos
+
+    def obtener_perfil(self, cliente_id: str) -> Optional[dict]:
+        if self.backend == "redis":
+            key = f"perfil:{cliente_id}"
+            raw = self._redis.get(key)
+            return json.loads(raw) if raw else None
+        else:
+            return self._store.get(cliente_id)
+
+    def actualizar_tipo_contribuyente(self, cliente_id: str, tipo: str):
+        perfil = self.obtener_perfil(cliente_id) or {}
+        perfil["tipo_contribuyente"] = tipo
+        self.guardar_perfil(cliente_id, perfil)
