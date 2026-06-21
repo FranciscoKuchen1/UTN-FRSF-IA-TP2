@@ -107,7 +107,6 @@ def obtener_fecha_hora() -> dict:
         "fecha": now.strftime("%d/%m/%Y"),
         "hora": now.strftime("%H:%M"),
         "mes": now.month,
-
         "dia_semana": now.strftime("%A")
     }
 

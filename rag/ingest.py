@@ -1,15 +1,17 @@
 """
 Script para cargar PDFs del estudio en Supabase pgvector.
-Uso: python -m rag.ingest --file docs/calendario_afip.pdf
+Uso: python -m rag.ingest --file docs/calendario_afip.pdf --source "Calendario AFIP 2026"
 """
 import os
 import argparse
-from supabase import create_client
-import google.generativeai as genai
+from dotenv import load_dotenv
+load_dotenv()
 
-# Configuración
-supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+from supabase import create_client
+from google import genai
+
+supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
+genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
     """Divide el texto en chunks con overlap."""
@@ -22,23 +24,25 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
     return chunks
 
 def embed_text(text: str) -> list[float]:
-    """Genera embedding con Google text-embedding-004."""
-    result = genai.embed_content(
-        model="models/text-embedding-004",
-        content=text,
-        task_type="retrieval_document"
+    """Genera embedding con Google Gemini Embedding 2."""
+    result = genai_client.models.embed_content(
+        model="models/gemini-embedding-2",
+        contents=text
     )
-    return result['embedding']
+    # result.embeddings es una lista de objetos Embedding, cada uno con .values
+    if not result.embeddings:
+        return []
+    values = result.embeddings[0].values
+    return values if values is not None else []
 
 def ingest_document(file_path: str, source_name: str):
     """Lee un PDF/TXT, lo chunkea, vectoriza e inserta en Supabase."""
-    # Leer texto (simplificado; en producción usar PyPDF2 o pymupdf)
     with open(file_path, 'r', encoding='utf-8') as f:
         text = f.read()
-    
+
     chunks = chunk_text(text)
     print(f"[INGEST] {len(chunks)} chunks de '{source_name}'")
-    
+
     for i, chunk in enumerate(chunks):
         embedding = embed_text(chunk)
         supabase.table("documentos").insert({
@@ -48,5 +52,13 @@ def ingest_document(file_path: str, source_name: str):
             "embedding": embedding
         }).execute()
         print(f"  [{i+1}/{len(chunks)}] insertado")
-    
+
     print("[INGEST] Completado.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", required=True, help="Ruta al archivo a ingerir")
+    parser.add_argument("--source", default=None, help="Nombre de fuente (default: nombre del archivo)")
+    args = parser.parse_args()
+    ingest_document(args.file, args.source or os.path.basename(args.file))

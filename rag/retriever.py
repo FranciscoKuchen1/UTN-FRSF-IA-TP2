@@ -1,25 +1,31 @@
 import os
-import google.generativeai as genai
-from supabase import create_client
+from dotenv import load_dotenv
+load_dotenv()
 
-supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+from google import genai
+from supabase import create_client
+from typing import Any
+
+supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
+genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", 0.7))
 
 def embed_query(query: str) -> list[float]:
-    result = genai.embed_content(
-        model="models/text-embedding-004",
-        content=query,
-        task_type="retrieval_query"
+    result = genai_client.models.embed_content(
+        model="models/gemini-embedding-2",
+        contents=query
     )
-    return result['embedding']
+    # result.embeddings es una lista de objetos Embedding, cada uno con .values
+    if not result.embeddings:
+        return []
+    values = result.embeddings[0].values
+    return values if values is not None else []
 
 def buscar_similar(query: str, top_k: int = 3) -> list[dict]:
     """Busca los chunks más similares a la query en Supabase."""
     query_embedding = embed_query(query)
-    
-    # RPC function en Supabase (ver abajo)
+
     response = supabase.rpc(
         "match_documentos",
         {
@@ -28,5 +34,13 @@ def buscar_similar(query: str, top_k: int = 3) -> list[dict]:
             "match_count": top_k
         }
     ).execute()
-    
-    return response.data or []
+
+    # response.data puede ser una lista o un valor singular; asegurar que retornamos lista
+    data: Any = response.data
+    if isinstance(data, list):
+        return data
+    elif data is None:
+        return []
+    else:
+        # Si es un dict singular, retornar en lista
+        return [data] if isinstance(data, dict) else []
