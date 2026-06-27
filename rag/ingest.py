@@ -13,7 +13,7 @@ from rag.embeddings import embed_text
 supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    """Divide el texto en chunks con overlap."""
+    """Split text into chunks with overlap."""
     words = text.split()
     chunks = []
     for i in range(0, len(words), chunk_size - overlap):
@@ -23,12 +23,12 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
     return chunks
 
 def ingest_document(file_path: str, source_name: str):
-    """Lee un PDF/TXT, lo chunkea, vectoriza e inserta en Supabase."""
+    """Read a text file, chunk it, embed each chunk and insert into Supabase."""
     with open(file_path, 'r', encoding='utf-8') as f:
         text = f.read()
 
     chunks = chunk_text(text)
-    print(f"[INGEST] {len(chunks)} chunks de '{source_name}'")
+    print(f"[INGEST] {len(chunks)} chunks from '{source_name}'")
 
     for i, chunk in enumerate(chunks):
         embedding = embed_text(chunk)
@@ -36,16 +36,16 @@ def ingest_document(file_path: str, source_name: str):
             "content": chunk,
             "source": source_name,
             "chunk_index": i,
-            "embedding": embedding
+            "embedding": embedding,
         }).execute()
-        print(f"  [{i+1}/{len(chunks)}] insertado")
+        print(f"  [{i+1}/{len(chunks)}] inserted")
 
-    print("[INGEST] Completado.")
+    print("[INGEST] Completed.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file", required=True, help="Ruta al archivo a ingerir")
-    parser.add_argument("--source", default=None, help="Nombre de fuente (default: nombre del archivo)")
+    parser.add_argument("--file", required=True, help="Path to file to ingest")
+    parser.add_argument("--source", default=None, help="Source name (default: file basename)")
     args = parser.parse_args()
     ingest_document(args.file, args.source or os.path.basename(args.file))

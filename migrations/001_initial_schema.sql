@@ -25,7 +25,7 @@ CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;  -- Para búsquedas aproximadas
 -- Relación con código:
 --   - rag/ingest.py: INSERT (línea 46-49)
 --   - rag/retriever.py: RPC match_documentos (línea 32-45)
---   - agent/tools.py: buscar_en_documentos (línea 51)
+--   - agent/tools.py: search_documents (line 51)
 
 CREATE TABLE IF NOT EXISTS public.documentos (
     -- Identificadores
@@ -284,7 +284,7 @@ COMMENT ON INDEX public.idx_documentos_content_fulltext IS
 DEPENDENCIAS DE LA APLICACIÓN:
 
 1. agent/core.py → agent/tools.py
-   - Ejecuta herramienta "buscar_en_documentos"
+    - Executes tool "search_documents"
 
 2. agent/tools.py → rag/retriever.py
    - Llama a buscar_similar(query, top_k=3)

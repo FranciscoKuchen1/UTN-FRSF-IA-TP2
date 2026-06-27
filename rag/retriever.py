@@ -11,8 +11,13 @@ supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY"
 
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", 0.7))
 
-def buscar_similar(query: str, top_k: int = 3) -> list[dict]:
-    """Busca los chunks más similares a la query en Supabase."""
+
+def search_similar(query: str, top_k: int = 3) -> list[dict]:
+    """Return the chunks most similar to the provided query from Supabase.
+
+    Uses the `match_documentos` RPC on Supabase which expects a vector and
+    returns rows with a `similarity` field.
+    """
     query_embedding = embed_query(query)
 
     response = supabase.rpc(
@@ -20,16 +25,15 @@ def buscar_similar(query: str, top_k: int = 3) -> list[dict]:
         {
             "query_embedding": query_embedding,
             "match_threshold": SIMILARITY_THRESHOLD,
-            "match_count": top_k
-        }
+            "match_count": top_k,
+        },
     ).execute()
 
-    # response.data puede ser una lista o un valor singular; asegurar que retornamos lista
+    # response.data can be a list or a single value; ensure we return a list
     data: Any = response.data
     if isinstance(data, list):
         return data
     elif data is None:
         return []
     else:
-        # Si es un dict singular, retornar en lista
         return [data] if isinstance(data, dict) else []
