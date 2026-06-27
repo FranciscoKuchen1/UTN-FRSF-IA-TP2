@@ -193,7 +193,7 @@ TTL: 604800 segundos (7 días)
 
 ```env
 # API Keys
-GEMINI_API_KEY=xxx                       # Google AI Studio
+GROQ_API_KEY=xxx                         # Groq API key
 LANGFUSE_SECRET_KEY=sk-lf-xxx           # Observabilidad (opcional)
 LANGFUSE_PUBLIC_KEY=pk-lf-xxx           # Observabilidad (opcional)
 
@@ -205,8 +205,8 @@ SUPABASE_KEY=sb_xxx
 MEMORY_BACKEND=redis                     # "redis" | "memory"
 REDIS_URL=rediss://default:pwd@host:port
 
-# Gemini
-LLM_MODEL=gemini-3.5-flash              # Model actual
+# Groq
+LLM_MODEL=qwen/qwen3-32b       # Model actual
 
 # Configuración
 MAX_REACT_ITERATIONS=5
@@ -390,6 +390,6 @@ SELECT * FROM public.documentos WHERE embedding IS NULL;
 ## 📚 Referencias Útiles
 
 - **Supabase pgvector**: https://supabase.com/docs/guides/database/extensions/pgvector
-- **Google Embeddings**: https://ai.google.dev/gemini-api/docs/embeddings
+- **Groq Embeddings**: https://groq.ai
 - **Similitud Coseno**: https://en.wikipedia.org/wiki/Cosine_similarity
 - **RLS en Supabase**: https://supabase.com/docs/guides/auth/row-level-security

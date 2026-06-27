@@ -1,5 +1,6 @@
+import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 import os
 from fastapi import FastAPI, HTTPException
@@ -44,7 +45,10 @@ async def chat(req: ChatRequest):
     try:
         response = agent.chat(req.message)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[ERROR] Fallo en chat: {error_trace}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
     return ChatResponse(response=response, session_id=req.session_id)
 

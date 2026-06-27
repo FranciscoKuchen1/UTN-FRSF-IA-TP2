@@ -1,26 +1,15 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
-from google import genai
 from supabase import create_client
 from typing import Any
 
+from rag.embeddings import embed_query
+
 supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
-genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", 0.7))
-
-def embed_query(query: str) -> list[float]:
-    result = genai_client.models.embed_content(
-        model="models/gemini-embedding-2",
-        contents=query
-    )
-    # result.embeddings es una lista de objetos Embedding, cada uno con .values
-    if not result.embeddings:
-        return []
-    values = result.embeddings[0].values
-    return values if values is not None else []
 
 def buscar_similar(query: str, top_k: int = 3) -> list[dict]:
     """Busca los chunks más similares a la query en Supabase."""

@@ -3,7 +3,7 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 
 class ShortTermMemory:
