@@ -4,18 +4,18 @@ import re
 from datetime import datetime
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 from agent.tools import TOOLS_SCHEMA, ejecutar_tool
 from agent.memory import ShortTermMemory, LongTermMemory
 from agent.prompts import SYSTEM_PROMPT
 from observability.logger import LangfuseLogger
 
-from google import genai
-from google.genai.errors import ClientError
+import groq
+from groq import AuthenticationError, PermissionDeniedError, RateLimitError
 
-genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+groq_client = groq.Client(api_key=os.getenv("GROQ_API_KEY"))
+LLM_MODEL = os.getenv("LLM_MODEL") or "qwen/qwen3-32b"
 
 MAX_ITER = int(os.getenv("MAX_REACT_ITERATIONS", 5))
 
@@ -36,35 +36,39 @@ class ReActAgent:
         )
 
     def _call_llm(self, messages: list[dict]) -> str:
-        """Llama al LLM (Gemini) y retorna el texto generado."""
+        """Llama al LLM (Groq) y retorna el texto generado."""
         self.logger.log_llm_call(messages)
 
         try:
-            # Gemini no tiene rol "system" nativo en este formato simple;
-            # se concatena todo el contexto como un único prompt de texto.
-            prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
-            response = genai_client.models.generate_content(
+            response = groq_client.chat.completions.create(
                 model=LLM_MODEL,
-                contents=prompt
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in messages
+                ],
+                max_tokens=1024,
+                temperature=0.2,
+                stop=["Final Answer:"]
             )
-            text = response.text or ""
+            choice = response.choices[0] if getattr(response, "choices", None) else None
+            text = ""
+            if choice is not None and getattr(choice, "message", None) is not None:
+                text = getattr(choice.message, "content", "")
+            text = text or ""
 
             self.logger.log_llm_response(text)
             return text
-        except ClientError as e:
-            # Manejar errores de API de Gemini (cuotas, credenciales, etc)
-            error_detail = str(e)
-            if "429" in error_detail or "RESOURCE_EXHAUSTED" in error_detail:
-                raise RuntimeError(
-                    "Los créditos de API de Google Generative AI se han agotado. "
-                    "Accede a https://ai.studio/projects para recargar tu cuenta."
-                )
-            elif "401" in error_detail or "UNAUTHENTICATED" in error_detail:
-                raise RuntimeError("Credenciales inválidas de Google Generative AI. Verifica GEMINI_API_KEY.")
-            elif "403" in error_detail or "PERMISSION_DENIED" in error_detail:
-                raise RuntimeError("Permisos insuficientes en la API de Google Generative AI.")
-            else:
-                raise RuntimeError(f"Error de API Gemini: {error_detail}")
+        except RateLimitError:
+            raise RuntimeError(
+                "Los créditos o cuota de la API de Groq se han agotado. "
+                "Verifica tu cuenta y el uso en el portal de Groq."
+            )
+        except AuthenticationError:
+            raise RuntimeError("Credenciales inválidas de Groq. Verifica GROQ_API_KEY.")
+        except PermissionDeniedError:
+            raise RuntimeError("Permisos insuficientes en la API de Groq.")
+        except Exception as e:
+            raise RuntimeError(f"Error de API Groq: {e}")
 
     def _parse_action(self, llm_output: str) -> tuple[str | None, dict | None, str | None]:
         """

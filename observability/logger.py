@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 from langfuse import get_client
 
@@ -25,7 +25,7 @@ class LangfuseLogger:
             as_type="generation",
             name="llm_call",
             input=messages,
-            model=os.getenv("LLM_MODEL", "gemini-2.0-flash")
+            model=os.getenv("LLM_MODEL", "qwen/qwen3-32b")
         )
         # Entrar al context manager para obtener el objeto observación
         self._current_observation = self._context_manager.__enter__()

@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.documentos (
     source TEXT NOT NULL,   -- Nombre del archivo/origen (ej: "Calendario AFIP 2026")
     chunk_index INTEGER,    -- Índice secuencial del chunk dentro del documento
     
-    -- Embeddings vectoriales (Google gemini-embedding-2 usa 3072 dimensiones)
+    -- Embeddings vectoriales (se normalizan a 3072 dimensiones para compatibilidad con la tabla actual)
     embedding vector(3072) NOT NULL,  -- Vector de embeddings para búsqueda semántica
     
     -- Metadata y timestamps

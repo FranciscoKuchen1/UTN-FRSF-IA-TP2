@@ -381,7 +381,7 @@ cd frontend && npm run dev
 ## 🔗 Archivos Principales
 
 ```
-📦 UTN-FRSF-IA-TP2-2.0.0
+📦 UTN-FRSF-IA-TP2
 │
 ├── 📄 ARQUITECTURA.md              ← Análisis técnico completo
 ├── 📄 MIGRATION_SETUP.md           ← Guía de ejecución

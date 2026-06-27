@@ -1,17 +1,16 @@
 """
-Script para cargar PDFs del estudio en Supabase pgvector.
-Uso: python -m rag.ingest --file docs/calendario_afip.pdf --source "Calendario AFIP 2026"
+python -m rag.ingest --file docs/calendario_afip.pdf --source "Calendario AFIP 2026"
 """
 import os
 import argparse
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 from supabase import create_client
-from google import genai
+
+from rag.embeddings import embed_text
 
 supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
-genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
     """Divide el texto en chunks con overlap."""
@@ -22,18 +21,6 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
         if chunk:
             chunks.append(chunk)
     return chunks
-
-def embed_text(text: str) -> list[float]:
-    """Genera embedding con Google Gemini Embedding 2."""
-    result = genai_client.models.embed_content(
-        model="models/gemini-embedding-2",
-        contents=text
-    )
-    # result.embeddings es una lista de objetos Embedding, cada uno con .values
-    if not result.embeddings:
-        return []
-    values = result.embeddings[0].values
-    return values if values is not None else []
 
 def ingest_document(file_path: str, source_name: str):
     """Lee un PDF/TXT, lo chunkea, vectoriza e inserta en Supabase."""
