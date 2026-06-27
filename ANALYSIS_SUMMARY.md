@@ -51,10 +51,10 @@ MIGRATION_SETUP.md                  ← Guía de ejecución (150 líneas)
 │  └────┬─────────────────────────────────────────────┘  │
 │       │                                                 │
 │       ├─→ agent/tools.py                              │
-│       │   ├─ buscar_en_documentos() ──┐               │
-│       │   ├─ consultar_vencimientos() │               │
-│       │   ├─ escalar_consulta()       │               │
-│       │   └─ obtener_fecha_hora()     │               │
+│       │   ├─ search_documents() ──┐               │
+│       │   ├─ get_due_dates() │               │
+│       │   ├─ escalate_query()       │               │
+│       │   └─ get_current_datetime()     │               │
 │       │                                │               │
 │       ├─→ agent/memory.py             │               │
 │       │   ├─ ShortTermMemory (sesión) │               │
@@ -62,7 +62,7 @@ MIGRATION_SETUP.md                  ← Guía de ejecución (150 líneas)
 │       │                                │               │
 │       ├─→ rag/retriever.py ←──────────┘               │
 │       │   ├─ embed_query()                            │
-│       │   └─ buscar_similar()                         │
+│       │   └─ search_similar()                         │
 │       │       └─→ Supabase RPC                        │
 │       │                                                │
 │       └─→ observability/logger.py                     │
@@ -92,7 +92,7 @@ USER QUERY: "¿Cuándo vence la declaración de IVA?"
             ↓
 [Tools: buscar_en_documentos()]
     ↓
-[RAG: buscar_similar(query)]
+[RAG: search_similar(query)]
     ├─ 1. embed_query(query) ──────→ Google API ──→ vector(768)
     │
     ├─ 2. supabase.rpc("match_documentos") ──┐
@@ -253,18 +253,18 @@ rag/retriever.py
         └─→ Requiere: función match_documentos + tabla documentos
 
 agent/tools.py
-    └─→ buscar_en_documentos()
-        └─→ rag/retriever.py:buscar_similar()
+    └─→ search_documents()
+        └─→ rag/retriever.py:search_similar()
             └─→ Supabase rpc("match_documentos")
 
 agent/core.py
-    └─→ ejecutar_tool("buscar_en_documentos", ...)
-        └─→ agent/tools.py:buscar_en_documentos()
+    └─→ execute_tool("search_documents", ...)
+        └─→ agent/tools.py:search_documents()
 
 agent/memory.py
-    └─→ LongTermMemory.guardar_perfil() → Redis SET
-    └─→ LongTermMemory.obtener_perfil() → Redis GET
-        └─→ Requiere: Redis Cloud (o fallback a memory)
+    └─→ LongTermMemory.save_profile() → Redis SET
+    └─→ LongTermMemory.get_profile() → Redis GET
+        └─→ Requires: Redis Cloud (or fallback to memory)
 
 observability/logger.py
     └─→ Langfuse API (no requiere BD Supabase)

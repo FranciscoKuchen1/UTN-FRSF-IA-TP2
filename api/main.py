@@ -8,10 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agent.core import ReActAgent
 
-app = FastAPI(title="Agente sEstudio Contable", version="0.3.0")
+app = FastAPI(title="Accounting Firm Assistant", version="0.3.0")
 
-# Orígenes permitidos para el frontend React (Vite usa 5173, CRA usa 3000).
-# Se puede sobreescribir con la variable de entorno FRONTEND_ORIGIN en .env
+# Allowed origins for the React frontend (Vite uses 5173, CRA uses 3000).
+# This can be overridden with the FRONTEND_ORIGIN environment variable in .env.
 _frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 
 app.add_middleware(
@@ -21,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Cache simple de agentes por sesión (en producción: persistir en Redis/DB)
+# Simple session cache for agents (in production, this should be persisted in Redis/DB)
 _agents: dict[str, ReActAgent] = {}
 
 
@@ -38,7 +38,7 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     if req.session_id not in _agents:
-        _agents[req.session_id] = ReActAgent(cliente_id=req.session_id)
+        _agents[req.session_id] = ReActAgent(client_id=req.session_id)
 
     agent = _agents[req.session_id]
 
@@ -47,8 +47,8 @@ async def chat(req: ChatRequest):
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"[ERROR] Fallo en chat: {error_trace}")
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+        print(f"[ERROR] Chat failed: {error_trace}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     return ChatResponse(response=response, session_id=req.session_id)
 
