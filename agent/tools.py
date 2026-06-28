@@ -88,6 +88,7 @@ def search_documents(query: str) -> dict:
                 {
                     "text": result.get("content", ""),
                     "source": result.get("source", "Fuente no informada"),
+                    "chunk_index": result.get("chunk_index"),
                     "similarity": result.get("similarity"),
                     "retrieval_method": result.get("retrieval_method", "semantic"),
                 }

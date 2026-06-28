@@ -1,4 +1,5 @@
 import json
+import inspect
 import os
 import re
 from collections.abc import Callable
@@ -178,7 +179,13 @@ class ReActAgent:
 
     def _execute_tool_safely(self, name: str, params: dict, context: dict | None = None) -> str:
         try:
-            result = self._tool_executor(name, params, context)
+            try:
+                inspect.signature(self._tool_executor).bind(name, params, context)
+            except (TypeError, ValueError):
+                # Backward compatibility for custom/test executors with two arguments.
+                result = self._tool_executor(name, params)
+            else:
+                result = self._tool_executor(name, params, context)
             return result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
         except Exception as exc:
             return json.dumps(
@@ -188,6 +195,48 @@ class ReActAgent:
                 },
                 ensure_ascii=False,
             )
+
+    @classmethod
+    def _log_tool_provenance(cls, tool_name: str, raw_result: Any) -> None:
+        """Print a concise, human-readable account of each tool's data source."""
+        payload = cls._decode_tool_result(raw_result)
+
+        if tool_name == "search_documents":
+            fragments = payload.get("fragments") or []
+            if not fragments:
+                detail = payload.get("message") or payload.get("error") or "sin resultados"
+                print(f"[FUENTES][RAG] No se recuperaron documentos: {detail}")
+                return
+
+            print(f"[FUENTES][RAG] Documentos recuperados: {len(fragments)}")
+            for position, fragment in enumerate(fragments, start=1):
+                source = fragment.get("source") or "Fuente no informada"
+                chunk = fragment.get("chunk_index")
+                method = fragment.get("retrieval_method") or "no informado"
+                similarity = fragment.get("similarity")
+                excerpt = " ".join(str(fragment.get("text") or "").split())[:180]
+
+                metadata = [f"metodo={method}"]
+                if chunk is not None:
+                    metadata.append(f"fragmento={chunk}")
+                if isinstance(similarity, (int, float)):
+                    metadata.append(f"similitud={similarity:.3f}")
+
+                print(
+                    f"[FUENTES][RAG][{position}] archivo={source} | "
+                    f"{' | '.join(metadata)}"
+                )
+                if excerpt:
+                    print(f"[FUENTES][RAG][{position}] extracto={excerpt}")
+            return
+
+        internal_sources = {
+            "get_due_dates": "agent/tools.py::DUE_DATES (tabla interna de vencimientos)",
+            "get_current_datetime": "reloj del sistema (zona America/Argentina/Buenos_Aires)",
+            "escalate_query": "historial de la conversacion y configuracion de Supabase",
+        }
+        source = internal_sources.get(tool_name, "origen no documentado")
+        print(f"[FUENTES][{tool_name}] base={source}")
 
     def _escalate(self, reason: str, user_message: str) -> str:
         context = {
@@ -240,6 +289,11 @@ class ReActAgent:
             tool_name, params, answer = self._parse_action(llm_output)
 
             if answer:
+                if not had_progress:
+                    print(
+                        "[FUENTES][LLM] Respuesta directa del modelo; "
+                        "no se consultaron documentos ni herramientas."
+                    )
                 final_answer = answer
                 break
 
@@ -252,6 +306,7 @@ class ReActAgent:
                 }
                 observation = self._execute_tool_safely(tool_name, params or {}, context)
                 print(f"[REACT][observation] {observation}")
+                self._log_tool_provenance(tool_name, observation)
 
                 if tool_name == "escalate_query":
                     payload = self._decode_tool_result(observation)

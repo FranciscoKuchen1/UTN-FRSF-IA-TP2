@@ -71,6 +71,42 @@ def test_parse_action_decodes_nested_json():
     assert final_answer is None
 
 
+def test_log_tool_provenance_prints_rag_sources(capsys):
+    ReActAgent._log_tool_provenance(
+        "search_documents",
+        {
+            "found": True,
+            "fragments": [
+                {
+                    "text": "El vencimiento mensual se produce el dia 20.",
+                    "source": "calendario-fiscal.pdf",
+                    "chunk_index": 4,
+                    "similarity": 0.8764,
+                    "retrieval_method": "semantic",
+                }
+            ],
+        },
+    )
+
+    output = capsys.readouterr().out
+    assert "archivo=calendario-fiscal.pdf" in output
+    assert "fragmento=4" in output
+    assert "similitud=0.876" in output
+    assert "extracto=El vencimiento mensual" in output
+
+
+def test_chat_marks_direct_model_answer_as_not_document_grounded(capsys):
+    agent = make_agent(
+        ["Final Answer: Respuesta general."],
+        lambda _name, _params: "{}",
+    )
+
+    assert agent.chat("Consulta general") == "Respuesta general."
+    output = capsys.readouterr().out
+    assert "Respuesta directa del modelo" in output
+    assert "no se consultaron documentos" in output
+
+
 def test_chat_runs_react_tool_then_returns_final_answer():
     calls = []
 
