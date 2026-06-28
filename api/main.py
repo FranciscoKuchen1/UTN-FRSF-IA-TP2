@@ -316,7 +316,19 @@ async def get_escalations(admin_data=Depends(get_current_admin)):
     try:
         user_client = admin_data["client"]
         res = user_client.table("escalations").select("*").eq("status", "pending").order("created_at", desc=True).execute()
-        return res.data
+        
+        data = res.data
+        if not data:
+            return []
+            
+        user_ids = list(set(d["user_id"] for d in data))
+        profiles_res = _supabase.table("profiles").select("id, nombre, apellido").in_("id", user_ids).execute()
+        profiles_map = {p["id"]: f"{p.get('nombre') or ''} {p.get('apellido') or ''}".strip() for p in profiles_res.data}
+        
+        for d in data:
+            d["user_name"] = profiles_map.get(d["user_id"]) or "Usuario"
+            
+        return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo derivaciones: {str(e)}")
 

@@ -93,7 +93,7 @@ export default function EscalationPanel() {
             <div className="flex justify-between items-start border-b border-line/50 pb-3">
               <div>
                 <p className="text-xs font-mono uppercase tracking-wider text-ink/40">Ticket ID: {esc.id.split('-')[0]}</p>
-                <p className="text-sm text-ink/60 font-medium">Usuario: {esc.user_id}</p>
+                <p className="text-sm text-ink/60 font-medium">Usuario: {esc.user_name || esc.user_id}</p>
               </div>
               <span className="text-xs text-ink/40 font-mono">
                 {new Date(esc.created_at).toLocaleString('es-AR')}

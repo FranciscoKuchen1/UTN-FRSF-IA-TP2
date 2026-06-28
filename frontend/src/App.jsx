@@ -87,7 +87,7 @@ function TypingIndicator() {
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function App() {
-  const { token, userId, logout } = useAuth()
+  const { token, userId, name, logout } = useAuth()
 
   const [messages, setMessages] = useState([
     {
@@ -165,7 +165,7 @@ export default function App() {
             </div>
             <div className="flex flex-col items-end gap-2">
               <span className="font-mono text-[10px] text-ink/40 truncate max-w-[140px]">
-                {userId}
+                {name}
               </span>
               <button
                 onClick={logout}
