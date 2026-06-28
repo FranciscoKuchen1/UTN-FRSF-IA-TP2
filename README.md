@@ -35,7 +35,7 @@ Stack:
 unzip UTN-FRSF-IA-TP2.zip
 cd UTN-FRSF-IA-TP2
 
-cp .env.groq.example .env
+cp .env.example .env
 ```
 
 ### 2. Completar `.env`
@@ -44,6 +44,7 @@ Edita `.env` y completa **como mínimo**:
 
 ```env
 GROQ_API_KEY=tu_api_key_aqui
+LLM_MODEL=qwen/qwen3-32b
 MEMORY_BACKEND=memory
 ```
 
@@ -259,6 +260,8 @@ Si usas `MEMORY_BACKEND=redis`, intenta:
 | `REDIS_URL` | Si `MEMORY_BACKEND=redis` | URL de Redis Cloud (ej: `rediss://...`) |
 | `SUPABASE_URL` | Si usas RAG | URL del proyecto Supabase |
 | `SUPABASE_KEY` | Si usas RAG | Clave de Supabase |
+| `NOMIC_API_KEY` | Para busqueda semantica | API key de Nomic; sin ella se usa busqueda textual |
+| `ACCOUNTANT_WEBHOOK_URL` | Opcional | Webhook para notificar derivaciones; siempre queda una cola local |
 | `LANGFUSE_SECRET_KEY` | Opcional | Clave de observabilidad |
 | `LANGFUSE_PUBLIC_KEY` | Opcional | Clave de observabilidad |
 | `MAX_REACT_ITERATIONS` | No (default: 5) | Máximo de pasos del agente |
@@ -313,10 +316,13 @@ Si querés que el agente busque en documentos del estudio:
    ```env
    SUPABASE_URL=https://...
    SUPABASE_KEY=...
+   NOMIC_API_KEY=...  # necesario para generar embeddings al cargar archivos
    ```
 4. Carga documentos:
    ```bash
    python -m rag.ingest --file docs/calendario.pdf --source "Calendario AFIP"
+   python -m rag.ingest --file docs/guia.docx --source "Guia impositiva"
+   python -m rag.ingest --file docs/notas.txt --source "Notas internas"
    ```
 
 Ver `rag/ingest.py` para más detalles.

@@ -13,11 +13,12 @@ Endpoints protegidos (requieren 'Authorization: Bearer <token>')
 """
 
 import os
+import tempfile
+from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
-import os
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -53,6 +54,23 @@ app.add_middleware(
 # Cache de agentes por sesión (user_id como clave)
 
 _agents: dict[str, ReActAgent] = {}
+
+
+def _load_taxpayer_type(user_id: str) -> str | None:
+    """Load the fiscal category stored in the user's profile."""
+    try:
+        response = (
+            _supabase.table("profiles")
+            .select("tipo_contribuyente")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if response.data:
+            return response.data[0].get("tipo_contribuyente")
+    except Exception as exc:
+        print(f"[WARN] No se pudo cargar el tipo de contribuyente: {exc}")
+    return None
 
 # ─── Dependencia de autenticación ────────────────────────────────────────────
 
@@ -119,7 +137,12 @@ async def login(body: LoginRequest):
         role = "cliente"
         try:
             print(f"Buscando perfil para user.id: {user.id}")
-            profile_res = _supabase.table("profiles").select("role").eq("id", user.id).execute()
+            profile_res = (
+                _supabase.table("profiles")
+                .select("role,tipo_contribuyente")
+                .eq("id", user.id)
+                .execute()
+            )
             print(f"Respuesta Supabase perfiles: {profile_res.data}")
             if profile_res.data and len(profile_res.data) > 0:
                 role = profile_res.data[0].get("role", "cliente")
@@ -171,7 +194,10 @@ async def chat(
     user_id = str(current_user.id)
 
     if user_id not in _agents:
-        _agents[user_id] = ReActAgent(client_id=user_id)
+        _agents[user_id] = ReActAgent(
+            client_id=user_id,
+            taxpayer_type=_load_taxpayer_type(user_id),
+        )
 
     agent = _agents[user_id]
 
@@ -207,9 +233,6 @@ async def upload_document(
     Sube un documento y lo procesa para el RAG.
     Requiere ser administrador.
     """
-    import os
-    import tempfile
-    
     # Validamos el rol de administrador desde Supabase
     try:
         profile_res = _supabase.table("profiles").select("role").eq("id", current_user.id).execute()
@@ -220,20 +243,40 @@ async def upload_document(
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail="Error verificando permisos.")
         
+    filename = Path(file.filename or "").name
+    extension = Path(filename).suffix.lower()
+    if extension not in {".pdf", ".docx", ".txt"}:
+        raise HTTPException(
+            status_code=415,
+            detail="Formato no soportado. Usa PDF, DOCX o TXT.",
+        )
+
+    max_upload_size = int(os.getenv("MAX_UPLOAD_SIZE_MB", "10")) * 1024 * 1024
+    contents = await file.read(max_upload_size + 1)
+    if len(contents) > max_upload_size:
+        raise HTTPException(status_code=413, detail="El archivo supera el tamano permitido.")
+
+    temp_path = None
     try:
         from rag.ingest import ingest_document
         
         # Crear un archivo temporal
-        fd, temp_path = tempfile.mkstemp(suffix=f"_{file.filename}")
-        with os.fdopen(fd, "wb") as f:
-            f.write(await file.read())
+        fd, temp_path = tempfile.mkstemp(suffix=extension)
+        with os.fdopen(fd, "wb") as temp_file:
+            temp_file.write(contents)
             
         # Llamar al flujo de ingestión
-        ingest_document(temp_path, source_name=file.filename)
-        
-        # Eliminar archivo temporal
-        os.remove(temp_path)
-        
-        return {"status": "success", "filename": file.filename}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al procesar el archivo: {str(e)}")
+        summary = ingest_document(temp_path, source_name=filename)
+        return {"status": "success", "filename": filename, **summary}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al procesar el archivo: {exc}",
+        )
+    finally:
+        if temp_path:
+            Path(temp_path).unlink(missing_ok=True)

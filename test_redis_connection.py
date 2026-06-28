@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def test_redis_connection():
+def check_redis_connection():
     """Prueba la conexión a Redis según la configuración en .env"""
     
     memory_backend = os.getenv("MEMORY_BACKEND", "redis").lower()
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print("")
     
-    success = test_redis_connection()
+    success = check_redis_connection()
     
     print("")
     print("=" * 60)
