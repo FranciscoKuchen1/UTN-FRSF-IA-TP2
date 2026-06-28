@@ -120,22 +120,22 @@ SELECT * FROM match_documentos(query_embedding, 0.7, 3)
 
 ## 🔧 Implementación Técnica
 
-### En `rag/retriever.py`:
+### In `rag/retriever.py`:
 ```python
-def buscar_similar(query: str, top_k: int = 3) -> list[dict]:
-    """Búsqueda secuencial (sin índice)."""
+def search_similar(query: str, top_k: int = 3) -> list[dict]:
+    """Sequential search (no vector index)."""
     query_embedding = embed_query(query)  # 3072 dims
-    
-    # Llamada RPC a Supabase
+
+    # RPC call to Supabase
     response = supabase.rpc(
         "match_documentos",
         {
             "query_embedding": query_embedding,  # 3072 dims
             "match_threshold": 0.7,
-            "match_count": top_k
-        }
+            "match_count": top_k,
+        },
     ).execute()
-    
+
     return response.data
 ```
 

@@ -9,7 +9,7 @@ function extraerFuente(texto) {
   return match ? match[1].trim() : null
 }
 
-const SUGERENCIAS = [
+const SUGGESTIONS = [
   '¿Cuándo vence mi declaración de IVA este mes?',
   '¿Qué documentación necesito para inscribirme como responsable inscripto?',
   '¿En qué categoría de monotributo entro si facturo $15M al año?',
@@ -36,21 +36,21 @@ function Avatar({ role }) {
   )
 }
 
-function FuenteSello({ fuente }) {
+function SourceBadge({ source }) {
   return (
     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 border border-stamp/40 text-stamp text-[11px] font-mono uppercase tracking-wide rotate-[-0.4deg] rounded-sm">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6" />
       </svg>
-      fuente · {fuente}
+      fuente · {source}
     </div>
   )
 }
 
 function Message({ role, content }) {
   const isUser = role === 'user'
-  const fuente = !isUser ? extraerFuente(content) : null
+  const source = !isUser ? extraerFuente(content) : null
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -65,7 +65,7 @@ function Message({ role, content }) {
         >
           {content}
         </div>
-        {fuente && <FuenteSello fuente={fuente} />}
+        {source && <SourceBadge source={source} />}
       </div>
     </div>
   )
@@ -96,9 +96,9 @@ export default function App() {
         'Hola, soy el asistente virtual del estudio. Puedo ayudarte con vencimientos, categorías de monotributo y trámites frecuentes. ¿En qué te puedo ayudar?',
     },
   ])
-  const [input, setInput]       = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [escalating, setEscalating] = useState(false)
   const scrollRef = useRef(null)
 
@@ -106,13 +106,11 @@ export default function App() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
-  // ── Chat ──────────────────────────────────────────────────────────────────
+  async function sendMessage(text) {
+    const message = text.trim()
+    if (!message || loading) return
 
-  async function enviarMensaje(texto) {
-    const mensaje = texto.trim()
-    if (!mensaje || loading) return
-
-    setMessages(prev => [...prev, { role: 'user', content: mensaje }])
+    setMessages((prev) => [...prev, { role: 'user', content: message }])
     setInput('')
     setLoading(true)
     setError(null)
@@ -124,7 +122,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,  // JWT — el backend extrae el user_id
         },
-        body: JSON.stringify({ message: mensaje }),  // sin session_id
+        body: JSON.stringify({ message }),  // sin session_id
       })
 
       if (res.status === 401) {
@@ -132,7 +130,7 @@ export default function App() {
         return
       }
       if (!res.ok) {
-        throw new Error(`El servidor respondió con estado ${res.status}`)
+        throw new Error(`The server responded with status ${res.status}`)
       }
 
       const data = await res.json()
@@ -187,7 +185,7 @@ export default function App() {
 
   function handleSubmit(e) {
     e.preventDefault()
-    enviarMensaje(input)
+    sendMessage(input)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -196,7 +194,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col items-center px-4 py-6 md:py-10">
       <div className="w-full max-w-2xl flex flex-col h-[88vh]">
 
-        {/* Encabezado */}
+        {/* Header styled like an accounting file cover */}
         <header className="border-b-2 border-ink/80 pb-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
@@ -221,7 +219,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* Mensajes */}
+        {/* Message list */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-ledger pr-1 space-y-5">
           {messages.map((m, i) => (
             <Message key={i} role={m.role} content={m.content} />
@@ -236,13 +234,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Sugerencias rápidas — solo al inicio */}
+        {/* Quick suggestions, shown only at the start */}
         {messages.length === 1 && (
           <div className="flex flex-wrap gap-2 mt-4">
-            {SUGERENCIAS.map(s => (
+            {SUGGESTIONS.map((s) => (
               <button
                 key={s}
-                onClick={() => enviarMensaje(s)}
+                onClick={() => sendMessage(s)}
                 className="text-xs font-body text-ledger border border-ledger/30 rounded-full px-3 py-1.5 hover:bg-ledger hover:text-paper transition-colors"
               >
                 {s}
@@ -256,11 +254,11 @@ export default function App() {
           <form onSubmit={handleSubmit} className="flex items-end gap-2">
             <textarea
               value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  enviarMensaje(input)
+                  sendMessage(input)
                 }
               }}
               placeholder="Escribí tu consulta…"
@@ -276,8 +274,9 @@ export default function App() {
             </button>
           </form>
 
-          {/* Botón de derivación manual — siempre visible */}
+          {/* Botón de derivación manual */}
           <button
+            type="button"
             onClick={escalarConsulta}
             disabled={escalating || loading}
             className="w-full font-body text-xs text-stamp border border-stamp/30 rounded-md py-2 hover:bg-stamp/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"

@@ -4,81 +4,84 @@ import re
 from datetime import datetime
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
-from agent.tools import TOOLS_SCHEMA, ejecutar_tool
+from agent.tools import TOOLS_SCHEMA, execute_tool
 from agent.memory import ShortTermMemory, LongTermMemory
 from agent.prompts import SYSTEM_PROMPT
 from observability.logger import LangfuseLogger
 
-from google import genai
-from google.genai.errors import ClientError
+import groq
+from groq import AuthenticationError, PermissionDeniedError, RateLimitError
 
-genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+groq_client = groq.Client(api_key=os.getenv("GROQ_API_KEY"))
+LLM_MODEL = os.getenv("LLM_MODEL") or "qwen/qwen3-32b"
 
 MAX_ITER = int(os.getenv("MAX_REACT_ITERATIONS", 5))
 
 
 class ReActAgent:
 
-    def __init__(self, cliente_id: str = "anonimo"):
-        self.cliente_id = cliente_id
+    def __init__(self, client_id: str = "anonymous"):
+        self.client_id = client_id
         self.short_mem = ShortTermMemory()
         self.long_mem = LongTermMemory()
-        self.logger = LangfuseLogger(session_id=cliente_id)
+        self.logger = LangfuseLogger(session_id=client_id)
 
     def _build_system(self) -> str:
-        perfil = self.long_mem.obtener_perfil(self.cliente_id) or {}
+        profile = self.long_mem.get_profile(self.client_id) or {}
         return SYSTEM_PROMPT.format(
-            tipo_contribuyente=perfil.get("tipo_contribuyente", "no informado"),
-            fecha_actual=datetime.now().strftime("%d/%m/%Y")
+            taxpayer_type=profile.get("taxpayer_type", "not provided"),
+            current_date=datetime.now().strftime("%d/%m/%Y"),
         )
 
     def _call_llm(self, messages: list[dict]) -> str:
-        """Llama al LLM (Gemini) y retorna el texto generado."""
+        """Call the LLM (Groq) and return the generated text."""
         self.logger.log_llm_call(messages)
 
         try:
-            # Gemini no tiene rol "system" nativo en este formato simple;
-            # se concatena todo el contexto como un único prompt de texto.
-            prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
-            response = genai_client.models.generate_content(
+            response = groq_client.chat.completions.create(
                 model=LLM_MODEL,
-                contents=prompt
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in messages
+                ],
+                max_tokens=1024,
+                temperature=0.2,
+                stop=["Final Answer:"]
             )
-            text = response.text or ""
+            choice = response.choices[0] if getattr(response, "choices", None) else None
+            text = ""
+            if choice is not None and getattr(choice, "message", None) is not None:
+                text = getattr(choice.message, "content", "")
+            text = text or ""
 
             self.logger.log_llm_response(text)
             return text
-        except ClientError as e:
-            # Manejar errores de API de Gemini (cuotas, credenciales, etc)
-            error_detail = str(e)
-            if "429" in error_detail or "RESOURCE_EXHAUSTED" in error_detail:
-                raise RuntimeError(
-                    "Los créditos de API de Google Generative AI se han agotado. "
-                    "Accede a https://ai.studio/projects para recargar tu cuenta."
-                )
-            elif "401" in error_detail or "UNAUTHENTICATED" in error_detail:
-                raise RuntimeError("Credenciales inválidas de Google Generative AI. Verifica GEMINI_API_KEY.")
-            elif "403" in error_detail or "PERMISSION_DENIED" in error_detail:
-                raise RuntimeError("Permisos insuficientes en la API de Google Generative AI.")
-            else:
-                raise RuntimeError(f"Error de API Gemini: {error_detail}")
+        except RateLimitError:
+            raise RuntimeError(
+                "Groq API rate limit exceeded or credits depleted. Check your Groq account."
+            )
+        except AuthenticationError:
+            raise RuntimeError("Invalid Groq credentials. Check GROQ_API_KEY.")
+        except PermissionDeniedError:
+            raise RuntimeError("Insufficient permissions for Groq API.")
+        except Exception as e:
+            raise RuntimeError(f"Groq API error: {e}")
 
     def _parse_action(self, llm_output: str) -> tuple[str | None, dict | None, str | None]:
         """
-        Extrae Action y Action Input del output del LLM.
-        Retorna (tool_name, params, final_answer)
+        Extract Action and Action Input from the LLM output.
+        Returns (tool_name, params, final_answer).
         """
-        # Detectar respuesta final
-        final_match = re.search(r"Final Answer:\s*(.+)", llm_output, re.DOTALL)
+        # Detect final answer (case-insensitive)
+        final_match = re.search(r"final answer:\s*(.+)", llm_output, re.IGNORECASE | re.DOTALL)
         if final_match:
             return None, None, final_match.group(1).strip()
 
-        # Detectar action
-        action_match = re.search(r"Action:\s*(\w+)", llm_output)
-        input_match = re.search(r"Action Input:\s*(\{.+?\})", llm_output, re.DOTALL)
+        # Detect action
+        action_match = re.search(r"action:\s*(\w+)", llm_output, re.IGNORECASE)
+        input_match = re.search(r"action input:\s*(\{.+?\})", llm_output, re.IGNORECASE | re.DOTALL)
 
         if action_match and input_match:
             tool_name = action_match.group(1).strip()
@@ -88,30 +91,30 @@ class ReActAgent:
                 params = {}
             return tool_name, params, None
 
-        # Si el LLM no siguió el formato, forzar respuesta final
-        return None, None, llm_output.strip()
+        # If the LLM did not follow the expected format, do not expose the raw reasoning as a user answer.
+        return None, None, None
 
     def chat(self, user_message: str) -> str:
-        """Punto de entrada principal. Ejecuta el loop ReAct y devuelve la respuesta."""
+        """Main entry point. Runs the ReAct loop and returns the response."""
 
-        # Agregar mensaje del usuario al historial
+        # Add the user message to the history
         self.short_mem.add("user", user_message)
 
-        # Armar contexto completo
+        # Build the full context
         system = self._build_system()
         tools_desc = json.dumps(TOOLS_SCHEMA, ensure_ascii=False, indent=2)
 
-        # Construir lista de mensajes para el LLM
+        # Build message list for the LLM
         messages = [
-            {"role": "system", "content": f"{system}\n\nHerramientas disponibles (JSON Schema):\n{tools_desc}"},
-            *self.short_mem.get_history()
+            {"role": "system", "content": f"{system}\n\nAvailable tools (JSON Schema):\n{tools_desc}"},
+            *self.short_mem.get_history(),
         ]
 
         final_answer = None
-        scratchpad = ""  # acumula el razonamiento de esta vuelta
+        scratchpad = ""  # accumulates the reasoning for this turn
 
         for iteration in range(MAX_ITER):
-            # Si hay scratchpad de iteraciones anteriores, agregarlo
+            # If there is scratchpad from previous iterations, append it
             if scratchpad:
                 messages_with_scratch = messages[:-1] + [
                     {"role": "assistant", "content": scratchpad},
@@ -121,42 +124,41 @@ class ReActAgent:
                 messages_with_scratch = messages
 
             llm_output = self._call_llm(messages_with_scratch)
+            print(f"[REACT][iteration {iteration + 1}] {llm_output.strip()}")
             scratchpad += llm_output + "\n"
 
             tool_name, params, answer = self._parse_action(llm_output)
 
             if answer:
-                # El LLM llegó a una respuesta final
+                # The LLM produced a final answer
                 final_answer = answer
                 break
 
             if tool_name:
-                # Ejecutar la tool
-                observation = ejecutar_tool(tool_name, params or {})
+                # Execute the tool
+                observation = execute_tool(tool_name, params or {})
+                print(f"[REACT][observation] {observation}")
                 scratchpad += f"Observation: {observation}\n"
 
-                # Detectar si el cliente mencionó su tipo de contribuyente
+                # Detect and save taxpayer type if mentioned
                 self._extract_and_save_profile(user_message, observation)
 
-        # Fallback si se agotaron las iteraciones
+        # Fallback if iterations are exhausted
         if not final_answer:
             if scratchpad:
-                final_answer = "No pude completar tu consulta automáticamente. La derivé al contador para que te contacte."
-                ejecutar_tool("escalar_consulta", {
-                    "motivo": "timeout_react_loop",
-                    "datos_cliente": user_message
-                })
+                final_answer = "No pude completar tu consulta automáticamente. La derivé al contador."
+                execute_tool("escalate_query", {"reason": "timeout_react_loop", "client_data": user_message})
             else:
-                final_answer = "Ocurrió un error inesperado. Por favor, intentá de nuevo."
+                final_answer = "Ocurrió un error inesperado. Intentá nuevamente."
 
-        # Guardar respuesta en historial
+        # Save the answer in history
         self.short_mem.add("assistant", final_answer)
         return final_answer
 
     def _extract_and_save_profile(self, user_msg: str, observation: str):
-        """Detecta menciones de tipo de contribuyente y lo guarda en memoria persistente."""
+        """Detect mentions of taxpayer type in the user message and save to long-term memory."""
         msg_lower = user_msg.lower()
         if "monotributo" in msg_lower:
-            self.long_mem.actualizar_tipo_contribuyente(self.cliente_id, "monotributo")
+            self.long_mem.update_taxpayer_type(self.client_id, "monotributo")
         elif "responsable inscripto" in msg_lower or "iva" in msg_lower:
-            self.long_mem.actualizar_tipo_contribuyente(self.cliente_id, "responsable_inscripto")
+            self.long_mem.update_taxpayer_type(self.client_id, "responsable_inscripto")

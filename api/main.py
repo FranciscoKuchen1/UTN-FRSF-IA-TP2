@@ -1,3 +1,4 @@
+
 """
 Backend FastAPI — Agente Contable IA
 =====================================
@@ -11,8 +12,10 @@ Endpoints protegidos (requieren 'Authorization: Bearer <token>')
   DELETE /chat       → limpia el historial de la sesión activa
 """
 
+import os
+
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 import os
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
@@ -38,6 +41,7 @@ app = FastAPI(
     description="Asistente virtual para clientes de estudio contable — arquitectura ReAct + RAG",
 )
 
+
 _frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
@@ -47,6 +51,7 @@ app.add_middleware(
 )
 
 # Cache de agentes por sesión (user_id como clave)
+
 _agents: dict[str, ReActAgent] = {}
 
 # ─── Dependencia de autenticación ────────────────────────────────────────────
@@ -166,7 +171,7 @@ async def chat(
     user_id = str(current_user.id)
 
     if user_id not in _agents:
-        _agents[user_id] = ReActAgent(cliente_id=user_id)
+        _agents[user_id] = ReActAgent(client_id=user_id)
 
     agent = _agents[user_id]
 
