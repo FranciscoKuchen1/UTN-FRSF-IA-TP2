@@ -6,8 +6,8 @@ funcionales y **memoria** conversacional. Ver el informe técnico de la 1ª entr
 detalle conceptual completo (objetivo, percepciones/acciones, ambiente y arquitectura).
 
 Stack:
-- **Backend**: Python + FastAPI, agente ReAct sobre Gemini 2.0 Flash
-- **RAG**: Supabase pgvector + embeddings `text-embedding-004` (opcional)
+- **Backend**: Python + FastAPI, agente ReAct sobre Groq
+- **RAG**: Supabase pgvector + Groq embeddings
 - **Memoria**: corto plazo en context window; largo plazo (perfil del cliente) en **Redis Cloud** o en memoria de proceso
 - **Frontend**: React + Vite + Tailwind CSS
 - **Observabilidad**: Langfuse (opcional)
@@ -22,7 +22,7 @@ Stack:
 
 - Python 3.11+
 - Node.js 18+ y npm
-- Una API key de Gemini ([Google AI Studio](https://aistudio.google.com/apikey))
+- Una API key de Groq
 - **(Opcional)** Una database en Redis Cloud para persistencia (Upstash o Redis Cloud — ambas free)
 
 ---
@@ -32,10 +32,10 @@ Stack:
 ### 1. Descargar y preparar
 
 ```bash
-unzip UTN-FRSF-IA-TP2-sin-docker.zip
-cd UTN-FRSF-IA-TP2-sin-docker
+unzip UTN-FRSF-IA-TP2.zip
+cd UTN-FRSF-IA-TP2
 
-cp .env.example .env
+cp .env.groq.example .env
 ```
 
 ### 2. Completar `.env`
@@ -43,7 +43,7 @@ cp .env.example .env
 Edita `.env` y completa **como mínimo**:
 
 ```env
-GEMINI_API_KEY=tu_api_key_aqui
+GROQ_API_KEY=tu_api_key_aqui
 MEMORY_BACKEND=memory
 ```
 
@@ -254,7 +254,7 @@ Si usas `MEMORY_BACKEND=redis`, intenta:
 
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
-| `GEMINI_API_KEY` | ✓ | API key de Google AI Studio |
+| `GROQ_API_KEY` | ✓ | API key de Groq |
 | `MEMORY_BACKEND` | ✓ | `memory` (desarrollo) o `redis` (producción) |
 | `REDIS_URL` | Si `MEMORY_BACKEND=redis` | URL de Redis Cloud (ej: `rediss://...`) |
 | `SUPABASE_URL` | Si usas RAG | URL del proyecto Supabase |

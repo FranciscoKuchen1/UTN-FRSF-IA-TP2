@@ -9,9 +9,9 @@ const AuthContext = createContext(null)
  */
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState({
-    token:   null,   // JWT emitido por el backend
-    role:    null,   // 'cliente' | 'admin'
-    userId:  null,   // user_id devuelto por /auth/login
+    token: null,   // JWT emitido por el backend
+    role: null,   // 'cliente' | 'admin'
+    userId: null,   // user_id devuelto por /auth/login
   })
 
   function login(token, role, userId) {
