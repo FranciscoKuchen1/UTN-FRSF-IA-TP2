@@ -12,14 +12,15 @@ export function AuthProvider({ children }) {
     token: null,   // JWT emitido por el backend
     role: null,   // 'cliente' | 'admin'
     userId: null,   // user_id devuelto por /auth/login
+    name: null,     // nombre del usuario
   })
 
-  function login(token, role, userId) {
-    setAuth({ token, role, userId })
+  function login(token, role, userId, name) {
+    setAuth({ token, role, userId, name })
   }
 
   function logout() {
-    setAuth({ token: null, role: null, userId: null })
+    setAuth({ token: null, role: null, userId: null, name: null })
   }
 
   return (
