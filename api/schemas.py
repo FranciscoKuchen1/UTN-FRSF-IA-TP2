@@ -50,6 +50,7 @@ from datetime import datetime
 class EscalationResponse(BaseModel):
     id: str
     user_id: str
+    user_name: str | None = None
     original_query: str
     summary: str
     status: str

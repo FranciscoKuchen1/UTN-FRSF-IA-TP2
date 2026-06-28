@@ -4,23 +4,35 @@ const AuthContext = createContext(null)
 
 /**
  * Provee token, role, user_id y las acciones login/logout.
- * El token se guarda SOLO en estado React (memoria), nunca en localStorage
- * ni sessionStorage, por lo que se pierde al cerrar/recargar la pestaña.
+ * El token se guarda en localStorage para mantener la sesión activa al recargar.
  */
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState({
-    token: null,   // JWT emitido por el backend
-    role: null,   // 'cliente' | 'admin'
-    userId: null,   // user_id devuelto por /auth/login
-    name: null,     // nombre del usuario
+  const [auth, setAuth] = useState(() => {
+    const storedAuth = localStorage.getItem('auth')
+    if (storedAuth) {
+      try {
+        return JSON.parse(storedAuth)
+      } catch (e) {
+        console.error('Error parsing auth from localStorage', e)
+      }
+    }
+    return {
+      token: null,
+      role: null,
+      userId: null,
+      name: null,
+    }
   })
 
   function login(token, role, userId, name) {
-    setAuth({ token, role, userId, name })
+    const newAuth = { token, role, userId, name }
+    setAuth(newAuth)
+    localStorage.setItem('auth', JSON.stringify(newAuth))
   }
 
   function logout() {
     setAuth({ token: null, role: null, userId: null, name: null })
+    localStorage.removeItem('auth')
   }
 
   return (
