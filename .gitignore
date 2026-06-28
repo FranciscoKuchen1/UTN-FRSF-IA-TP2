@@ -221,3 +221,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 .DS_Store
+
+# Frontend Dependencies
+node_modules/
+frontend/node_modules/
