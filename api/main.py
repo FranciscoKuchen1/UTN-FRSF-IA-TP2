@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client, AuthApiError
@@ -191,3 +191,44 @@ async def clear_session(current_user=Depends(get_current_user)):
     if user_id in _agents:
         del _agents[user_id]
     return {"cleared": True, "session_id": user_id}
+
+
+@app.post("/admin/upload", tags=["Admin"])
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user)
+):
+    """
+    Sube un documento y lo procesa para el RAG.
+    Requiere ser administrador.
+    """
+    import os
+    import tempfile
+    
+    # Validamos el rol de administrador desde Supabase
+    try:
+        profile_res = _supabase.table("profiles").select("role").eq("id", current_user.id).execute()
+        role = profile_res.data[0].get("role") if profile_res.data else "cliente"
+        if role != "admin":
+            raise HTTPException(status_code=403, detail="No tienes permisos para realizar esta acción.")
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail="Error verificando permisos.")
+        
+    try:
+        from rag.ingest import ingest_document
+        
+        # Crear un archivo temporal
+        fd, temp_path = tempfile.mkstemp(suffix=f"_{file.filename}")
+        with os.fdopen(fd, "wb") as f:
+            f.write(await file.read())
+            
+        # Llamar al flujo de ingestión
+        ingest_document(temp_path, source_name=file.filename)
+        
+        # Eliminar archivo temporal
+        os.remove(temp_path)
+        
+        return {"status": "success", "filename": file.filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar el archivo: {str(e)}")
