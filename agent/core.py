@@ -39,7 +39,7 @@ class ReActAgent:
         *,
         taxpayer_type: str | None = None,
         llm_callable: Callable[[list[dict]], str] | None = None,
-        tool_executor: Callable[[str, dict], str] = execute_tool,
+        tool_executor: Callable[[str, dict, dict | None], str] = execute_tool,
         short_memory: ShortTermMemory | None = None,
         long_memory: LongTermMemory | None = None,
         logger: LangfuseLogger | None = None,
@@ -176,9 +176,9 @@ class ReActAgent:
                 return {"result": raw_result}
         return {"result": raw_result}
 
-    def _execute_tool_safely(self, name: str, params: dict) -> str:
+    def _execute_tool_safely(self, name: str, params: dict, context: dict | None = None) -> str:
         try:
-            result = self._tool_executor(name, params)
+            result = self._tool_executor(name, params, context)
             return result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
         except Exception as exc:
             return json.dumps(
@@ -190,9 +190,15 @@ class ReActAgent:
             )
 
     def _escalate(self, reason: str, user_message: str) -> str:
+        context = {
+            "client_id": self.client_id,
+            "history": self.short_mem.get_history(),
+            "llm_callable": self._call_llm  # Pass the LLM callable so the tool can use it with observability
+        }
         result = self._execute_tool_safely(
             "escalate_query",
             {"reason": reason, "client_data": user_message},
+            context
         )
         payload = self._decode_tool_result(result)
         return payload.get("message") or (
@@ -239,7 +245,12 @@ class ReActAgent:
 
             if tool_name:
                 had_progress = True
-                observation = self._execute_tool_safely(tool_name, params or {})
+                context = {
+                    "client_id": self.client_id,
+                    "history": self.short_mem.get_history(),
+                    "llm_callable": self._call_llm
+                }
+                observation = self._execute_tool_safely(tool_name, params or {}, context)
                 print(f"[REACT][observation] {observation}")
 
                 if tool_name == "escalate_query":

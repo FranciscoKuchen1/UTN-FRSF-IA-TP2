@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -149,42 +150,70 @@ def _write_escalation_queue(payload: dict) -> bool:
         return False
 
 
-def escalate_query(reason: str, client_data: str = "") -> dict:
-    """Persist the query locally and notify the webhook when configured."""
-    payload = {
-        "timestamp": datetime.now(ZoneInfo("America/Argentina/Buenos_Aires")).isoformat(),
-        "reason": reason,
-        "client_data": client_data,
-        "status": "pending",
-    }
-    queued_locally = _write_escalation_queue(payload)
-
-    webhook_url = os.getenv("ACCOUNTANT_WEBHOOK_URL", "").strip()
-    webhook_sent = False
-    if webhook_url:
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=10)
-            webhook_sent = response.status_code < 400
-        except requests.RequestException as exc:
-            print(f"[ESCALATION] Webhook delivery failed: {exc}")
-    else:
-        print("[ESCALATION] ACCOUNTANT_WEBHOOK_URL not configured; queued locally only.")
-
-    print(f"[ESCALATION] {payload}")
-    if webhook_sent:
-        message = "Tu consulta fue derivada al contador. Se comunicara con vos a la brevedad."
-    elif queued_locally:
-        message = "Tu consulta quedo registrada para revision del contador."
-    else:
-        message = (
-            "No pude registrar la derivacion automaticamente. "
-            "Por favor, comunicate con el estudio contable."
+def escalate_query(reason: str, client_data: str = "", context: dict | None = None) -> dict:
+    """Persiste la consulta en la BD con un resumen generado por el LLM."""
+    history = context.get("history", []) if context else []
+    client_id = context.get("client_id", "anonymous") if context else "anonymous"
+    llm_callable = context.get("llm_callable") if context else None
+    
+    summary = "Sin resumen disponible."
+    if history and llm_callable:
+        summary_prompt = (
+            "Genera un breve resumen en ESPAÑOL (1 o 2 oraciones) del problema que el usuario "
+            "esta intentando resolver, basandote exclusivamente en este historial:\n"
         )
+        for msg in history:
+            summary_prompt += f"{msg['role']}: {msg['content']}\n"
+        
+        try:
+            raw_summary = llm_callable([{"role": "user", "content": summary_prompt}]).strip()
+            summary = re.sub(r'<think>.*?</think>', '', raw_summary, flags=re.DOTALL).strip()
+        except Exception as e:
+            print(f"[ESCALATION] Error generando resumen: {e}")
+            summary = "Error al generar resumen."
+
+    # Extraer el último mensaje real del usuario
+    user_msgs = [m.get("content", "") for m in history if m.get("role") == "user"]
+    real_query = user_msgs[-1] if user_msgs else (client_data or reason)
+
+    # Insertar en Supabase y obtener contacto
+    saved = False
+    contact_info = ""
+    try:
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        if url and key:
+            _supabase = create_client(url, key)
+            
+            # Guardar el ticket
+            _supabase.table("escalations").insert({
+                "user_id": client_id,
+                "original_query": real_query,
+                "summary": summary,
+                "status": "pending"
+            }).execute()
+            saved = True
+            
+            # Obtener el contacto
+            res = _supabase.table("settings").select("value").eq("key", "contact_info").execute()
+            if res.data and res.data[0]["value"]:
+                contact_info = res.data[0]["value"]
+                
+        else:
+            print("[ESCALATION] No Supabase credentials.")
+    except Exception as exc:
+        print(f"[ESCALATION] Error guardando ticket o leyendo settings: {exc}")
+
+    if saved:
+        message = "Tu consulta fue derivada a un contador. Lo revisaremos a la brevedad."
+        if contact_info:
+            message += f" También puedes comunicarte directamente al: {contact_info}"
+    else:
+        message = "No pude registrar la derivación automáticamente. Por favor, comunícate con el estudio."
 
     return {
-        "escalated": webhook_sent or queued_locally,
-        "webhook_sent": webhook_sent,
-        "queued_locally": queued_locally,
+        "escalated": saved,
         "message": message,
     }
 
@@ -216,12 +245,16 @@ TOOL_MAP = {
 }
 
 
-def execute_tool(name: str, params: dict) -> str:
+def execute_tool(name: str, params: dict, context: dict | None = None) -> str:
     if name not in TOOL_MAP:
-        return json.dumps({"error": f"Tool '{name}' not found"})
-
+        return json.dumps({"error": f"Herramienta desconocida: {name}"})
+    func = TOOL_MAP[name]
+    
+    if name == "escalate_query":
+        params["context"] = context
+        
     try:
-        result = TOOL_MAP[name](**params)
+        result = func(**params)
     except TypeError as exc:
         result = {
             "error": f"Parametros invalidos para la herramienta '{name}'.",

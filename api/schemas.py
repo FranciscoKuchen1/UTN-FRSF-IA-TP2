@@ -41,3 +41,23 @@ class ChatResponse(BaseModel):
     response: str
     session_id: str     # user_id del JWT; útil para que el frontend
                         # pueda correlacionar mensajes en logs/debug
+
+
+# ─── Escalations ─────────────────────────────────────────────────────────────
+
+from datetime import datetime
+
+class EscalationResponse(BaseModel):
+    id: str
+    user_id: str
+    original_query: str
+    summary: str
+    status: str
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+class EscalationReplyRequest(BaseModel):
+    message: str
+
+class ContactSettings(BaseModel):
+    contact_info: str

@@ -99,7 +99,6 @@ export default function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [escalating, setEscalating] = useState(false)
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -139,47 +138,6 @@ export default function App() {
       setError('No se pudo contactar al asistente. Verificá que el backend esté corriendo.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  // ── Escalado manual ───────────────────────────────────────────────────────
-
-  async function escalarConsulta() {
-    if (escalating || loading) return
-    setEscalating(true)
-    setError(null)
-
-    try {
-      const res = await fetch(`${API_URL}/escalate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          motivo: 'solicitud_manual_cliente',
-          datos_cliente: messages
-            .filter(m => m.role === 'user')
-            .map(m => m.content)
-            .join(' | '),
-        }),
-      })
-
-      if (res.status === 401) { logout(); return }
-
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.ok
-            ? 'Tu consulta fue derivada al contador. Te contactarán a la brevedad.'
-            : 'No pude derivar la consulta en este momento. Intentá más tarde.',
-        },
-      ])
-    } catch {
-      setError('No se pudo derivar la consulta. Verificá tu conexión.')
-    } finally {
-      setEscalating(false)
     }
   }
 
@@ -275,14 +233,6 @@ export default function App() {
           </form>
 
           {/* Botón de derivación manual */}
-          <button
-            type="button"
-            onClick={escalarConsulta}
-            disabled={escalating || loading}
-            className="w-full font-body text-xs text-stamp border border-stamp/30 rounded-md py-2 hover:bg-stamp/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            {escalating ? 'Derivando…' : '📋 Derivar consulta al contador'}
-          </button>
         </div>
 
       </div>

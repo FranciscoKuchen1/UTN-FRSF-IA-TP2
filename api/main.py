@@ -25,14 +25,17 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client, AuthApiError
 
 from agent.core import ReActAgent
-from api.schemas import LoginRequest, LoginResponse, ChatRequest, ChatResponse
+from api.schemas import ChatRequest, ChatResponse, LoginRequest, LoginResponse, EscalationResponse, EscalationReplyRequest, ContactSettings
+from api.services.notifications import ConsoleNotificationService
 
 # ─── Clientes globales ────────────────────────────────────────────────────────
 
 _supabase: Client = create_client(
-    os.getenv("SUPABASE_URL", ""),
-    os.getenv("SUPABASE_KEY", ""),
+    supabase_url=os.getenv("SUPABASE_URL", ""),
+    supabase_key=os.getenv("SUPABASE_KEY", ""),
 )
+
+notification_service = ConsoleNotificationService()
 
 # ─── App ─────────────────────────────────────────────────────────────────────
 
@@ -112,6 +115,34 @@ async def get_current_user(
     except Exception:
         # Nunca exponer detalles internos de Supabase al cliente
         raise HTTPException(status_code=401, detail="Error de autenticación.")
+
+
+def get_user_supabase(token: str) -> Client:
+    """Crea un cliente Supabase configurado con el JWT del usuario para respetar RLS."""
+    client = create_client(
+        supabase_url=os.getenv("SUPABASE_URL", ""),
+        supabase_key=os.getenv("SUPABASE_KEY", ""),
+    )
+    client.postgrest.auth(token)
+    return client
+
+
+async def get_current_admin(
+    current_user=Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)
+):
+    """Dependencia que asegura que el usuario sea administrador y retorna un cliente autenticado."""
+    try:
+        token = credentials.credentials
+        user_client = get_user_supabase(token)
+        profile_res = user_client.table("profiles").select("role").eq("id", current_user.id).execute()
+        role = profile_res.data[0].get("role") if profile_res.data else "cliente"
+        if role != "admin":
+            raise HTTPException(status_code=403, detail="No tienes permisos para realizar esta acción.")
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail="Error verificando permisos.")
+    return {"user": current_user, "token": token, "client": user_client}
 
 
 # ─── Endpoints públicos ───────────────────────────────────────────────────────
@@ -234,22 +265,12 @@ async def clear_session(current_user=Depends(get_current_user)):
 @app.post("/admin/upload", tags=["Admin"])
 async def upload_document(
     file: UploadFile = File(...),
-    current_user=Depends(get_current_user)
+    admin_data=Depends(get_current_admin)
 ):
     """
     Sube un documento y lo procesa para el RAG.
     Requiere ser administrador.
     """
-    # Validamos el rol de administrador desde Supabase
-    try:
-        profile_res = _supabase.table("profiles").select("role").eq("id", current_user.id).execute()
-        role = profile_res.data[0].get("role") if profile_res.data else "cliente"
-        if role != "admin":
-            raise HTTPException(status_code=403, detail="No tienes permisos para realizar esta acción.")
-    except Exception as e:
-        if isinstance(e, HTTPException): raise e
-        raise HTTPException(status_code=500, detail="Error verificando permisos.")
-        
     filename = Path(file.filename or "").name
     extension = Path(filename).suffix.lower()
     if extension not in {".pdf", ".docx", ".txt"}:
@@ -287,3 +308,72 @@ async def upload_document(
     finally:
         if temp_path:
             Path(temp_path).unlink(missing_ok=True)
+
+
+@app.get("/admin/escalations", response_model=list[EscalationResponse], tags=["Admin"])
+async def get_escalations(admin_data=Depends(get_current_admin)):
+    """Obtiene la lista de tickets de derivación pendientes."""
+    try:
+        user_client = admin_data["client"]
+        res = user_client.table("escalations").select("*").eq("status", "pending").order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo derivaciones: {str(e)}")
+
+
+@app.post("/admin/escalations/{ticket_id}/reply", tags=["Admin"])
+async def reply_escalation(
+    ticket_id: str, 
+    body: EscalationReplyRequest, 
+    admin_data=Depends(get_current_admin)
+):
+    """Responde a un ticket de derivación y lo marca como resuelto."""
+    try:
+        user_client = admin_data["client"]
+        # Obtener el user_id del ticket
+        res = user_client.table("escalations").select("user_id").eq("id", ticket_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        user_id = res.data[0]["user_id"]
+        
+        # Enviar notificación
+        notification_service.send_response(user_id, body.message)
+        
+        # Actualizar ticket
+        user_client.table("escalations").update({
+            "status": "resolved",
+            "resolved_at": datetime.now().isoformat()
+        }).eq("id", ticket_id).execute()
+        
+        return {"status": "success", "message": "Respuesta enviada correctamente."}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/settings/contact", tags=["Settings"])
+async def get_contact_settings():
+    """Obtiene la info de contacto del estudio."""
+    try:
+        res = _supabase.table("settings").select("value").eq("key", "contact_info").execute()
+        if res.data:
+            return {"contact_info": res.data[0]["value"]}
+        return {"contact_info": ""}
+    except Exception as e:
+        return {"contact_info": ""}
+
+@app.post("/admin/settings/contact", tags=["Admin"])
+async def update_contact_settings(
+    settings: ContactSettings,
+    admin_data=Depends(get_current_admin)
+):
+    """Actualiza la información de contacto del estudio."""
+    try:
+        user_client = admin_data["client"]
+        user_client.table("settings").upsert({
+            "key": "contact_info",
+            "value": settings.contact_info,
+            "updated_at": datetime.now().isoformat()
+        }).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error actualizando settings: {str(e)}")
