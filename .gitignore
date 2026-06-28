@@ -224,3 +224,6 @@ __marimo__/
 
 # Node dependencies
 node_modules/
+
+# Runtime escalation queue
+data/escalations.jsonl

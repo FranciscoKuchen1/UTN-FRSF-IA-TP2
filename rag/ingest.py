@@ -1,149 +1,159 @@
-"""
-Script para cargar documentos del estudio en Supabase pgvector.
+"""Parse and ingest PDF, DOCX and TXT documents into Supabase pgvector."""
 
-Formatos soportados:
-  - .txt  -> lectura directa con open()
-  - .pdf  -> PyMuPDF (fitz)
-  - .docx -> python-docx
-
-Uso:
-  python -m rag.ingest --file docs/calendario_afip.pdf --source "Calendario AFIP 2026"
-  python -m rag.ingest --file docs/monotributo.docx   --source "Guia Monotributo"
-  python -m rag.ingest --file docs/notas.txt          --source "Notas internas"
-"""
+import argparse
 import os
 import re
-import argparse
-from dotenv import load_dotenv
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
+from pathlib import Path
 
-from supabase import create_client
+from dotenv import load_dotenv
+from supabase import Client, create_client
 
 from rag.embeddings import embed_text
 
-supabase = create_client(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", ""))
+load_dotenv(
+    dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"),
+    override=True,
+)
+
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+_supabase: Client | None = None
 
 
-# ---------------------------------------------------------------------------
-# Parsers por formato
-# ---------------------------------------------------------------------------
-
-def parse_pdf(path: str) -> str:
-    """
-    Extrae texto de todas las paginas de un PDF usando PyMuPDF.
-    Limpia espacios multiples, tabs y saltos de linea excesivos.
-    """
-    import fitz  # PyMuPDF
-
-    doc = fitz.open(path)
-    paginas = []
-    for pagina in doc:
-        texto = pagina.get_text("text")          # preserva orden de lectura
-        texto = re.sub(r"[ \t]+", " ", texto)    # colapsar espacios/tabs multiples
-        texto = re.sub(r"\n{3,}", "\n\n", texto) # maximo dos saltos consecutivos
-        texto = "\n".join(line.strip() for line in texto.splitlines())
-        paginas.append(texto.strip())
-    doc.close()
-
-    return "\n\n".join(p for p in paginas if p)
+def _get_supabase() -> Client:
+    global _supabase
+    if _supabase is None:
+        url = os.getenv("SUPABASE_URL", "").strip()
+        key = os.getenv("SUPABASE_KEY", "").strip()
+        if not url or not key:
+            raise RuntimeError("SUPABASE_URL y SUPABASE_KEY deben estar configuradas.")
+        _supabase = create_client(url, key)
+    return _supabase
 
 
-def parse_word(path: str) -> str:
-    """
-    Extrae texto de los parrafos de un archivo .docx usando python-docx.
-    Ignora parrafos vacios para no introducir ruido en los chunks.
-    """
+def _clean_text(text: str) -> str:
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return "\n".join(line.strip() for line in text.splitlines()).strip()
+
+
+def parse_pdf(path: str | Path) -> str:
+    """Extract selectable text from every page of a PDF."""
+    import fitz
+
+    document = fitz.open(path)
+    try:
+        pages = [_clean_text(page.get_text("text")) for page in document]
+    finally:
+        document.close()
+    return "\n\n".join(page for page in pages if page)
+
+
+def parse_word(path: str | Path) -> str:
+    """Extract non-empty paragraphs and table cells from a DOCX file."""
     from docx import Document
 
-    doc = Document(path)
-    parrafos = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-    return "\n\n".join(parrafos)
+    document = Document(path)
+    blocks = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                blocks.append(" | ".join(cells))
+
+    return "\n\n".join(blocks)
 
 
-def parse_txt(path: str) -> str:
-    """Lee un archivo de texto plano en UTF-8."""
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+def parse_txt(path: str | Path) -> str:
+    """Read plain text, accepting UTF-8 BOM and common Windows encoding."""
+    raw = Path(path).read_bytes()
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("El archivo TXT no usa una codificacion compatible (UTF-8 o CP1252).")
 
 
-def parse_file(path: str) -> str:
-    """
-    Detecta la extension del archivo y delega al parser correspondiente.
-
-    Extensiones soportadas: .pdf, .docx, .txt
-    Lanza ValueError si la extension no esta soportada.
-    """
-    ext = os.path.splitext(path)[1].lower()
-    parsers = {
-        ".pdf":  parse_pdf,
-        ".docx": parse_word,
-        ".txt":  parse_txt,
-    }
-    if ext not in parsers:
+def parse_file(path: str | Path) -> str:
+    """Validate a file and dispatch it to the matching parser."""
+    file_path = Path(path)
+    extension = file_path.suffix.lower()
+    parsers = {".pdf": parse_pdf, ".docx": parse_word, ".txt": parse_txt}
+    if extension not in parsers:
+        supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
         raise ValueError(
-            f"Extension '{ext}' no soportada. "
-            f"Formatos validos: {', '.join(parsers)}"
+            f"Extension '{extension or '<sin extension>'}' no soportada. "
+            f"Formatos validos: {supported}"
         )
-    return parsers[ext](path)
+    if not file_path.is_file():
+        raise FileNotFoundError(f"No existe el archivo: {file_path}")
 
+    text = _clean_text(parsers[extension](file_path))
+    if not text:
+        hint = " El PDF puede ser una imagen escaneada y requerir OCR." if extension == ".pdf" else ""
+        raise ValueError(f"No se pudo extraer texto del archivo.{hint}")
+    return text
 
-# ---------------------------------------------------------------------------
-# Chunking
-# ---------------------------------------------------------------------------
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    """Split text into chunks with overlap."""
+    """Split text into word-based chunks with a validated overlap."""
+    if chunk_size <= 0:
+        raise ValueError("chunk_size debe ser mayor que cero.")
+    if overlap < 0 or overlap >= chunk_size:
+        raise ValueError("overlap debe ser mayor o igual a cero y menor que chunk_size.")
+
     words = text.split()
-    chunks = []
     step = chunk_size - overlap
-    for i in range(0, len(words), step):
-        chunk = " ".join(words[i:i + chunk_size])
-        if chunk:
-            chunks.append(chunk)
-    return chunks
+    return [
+        " ".join(words[index:index + chunk_size])
+        for index in range(0, len(words), step)
+        if words[index:index + chunk_size]
+    ]
 
 
-def ingest_document(file_path: str, source_name: str):
-    """
-    Orquesta el pipeline completo:
-      1. Parsea el archivo (PDF / DOCX / TXT) con parse_file()
-      2. Divide el texto en chunks con overlap
-      3. Genera un embedding por chunk
-      4. Inserta cada chunk + embedding + metadatos en Supabase
-    """
+def ingest_document(file_path: str | Path, source_name: str) -> dict:
+    """Parse, chunk, embed and persist one supported document."""
     print(f"[INGEST] Parseando '{file_path}'...")
-    text = parse_file(file_path)  # usa el dispatcher, no open() directo
-
+    text = parse_file(file_path)
     chunks = chunk_text(text)
+    if not chunks:
+        raise ValueError("El documento no genero fragmentos para indexar.")
+
     print(f"[INGEST] {len(chunks)} chunks generados de '{source_name}'")
-
-    for i, chunk in enumerate(chunks):
+    client = _get_supabase()
+    for index, chunk in enumerate(chunks):
         embedding = embed_text(chunk)
-        supabase.table("documentos").insert({
-            "content":     chunk,
-            "source":      source_name,
-            "chunk_index": i,
-            "embedding": embedding,
-        }).execute()
-        print(f"  [{i+1}/{len(chunks)}] inserted")
+        if not embedding:
+            raise RuntimeError(f"No se genero el embedding del fragmento {index}.")
+        client.table("documentos").insert(
+            {
+                "content": chunk,
+                "source": source_name,
+                "chunk_index": index,
+                "embedding": embedding,
+            }
+        ).execute()
+        print(f"  [{index + 1}/{len(chunks)}] inserted")
 
-    print("[INGEST] Completed.")
+    return {
+        "source": source_name,
+        "format": Path(file_path).suffix.lower(),
+        "chunks": len(chunks),
+        "characters": len(text),
+    }
 
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
-        description="Carga un documento (PDF/DOCX/TXT) en Supabase pgvector."
+        description="Carga un documento PDF, DOCX o TXT en el indice RAG."
     )
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file", required=True, help="Path to file to ingest")
-    parser.add_argument("--source", default=None, help="Source name (default: file basename)")
-
+    parser.add_argument("--file", required=True, help="Ruta del archivo")
+    parser.add_argument("--source", default=None, help="Nombre de fuente")
     args = parser.parse_args()
 
-    ingest_document(args.file, args.source or os.path.basename(args.file))
+    summary = ingest_document(
+        args.file,
+        args.source or os.path.basename(args.file),
+    )
+    print(f"[INGEST] Completado: {summary}")
