@@ -5,6 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+file_path = Path(__file__).parents[1] / "data" / "vencimientos_arca_2026.json"
+with open (file_path, "r", encoding="utf-8") as f:
+    DUE_DATES = json.load(f)
+
 import requests
 
 from observability.logger import log_tool_call
@@ -28,26 +32,19 @@ TOOLS_SCHEMA = [
     },
     {
         "name": "get_due_dates",
-        "description": (
-            "Devolver obligaciones cuyo vencimiento ocurre en el mes calendario indicado."
-        ),
+        "description": "Consultar el calendario oficial de vencimientos impositivos. Podes filtrar por mes para obtener solo la informacion relevante.",
         "parameters": {
             "type": "object",
             "properties": {
+                "month": {
+                    "type": "string",
+                    "description": "Nombre del mes (ej: 'agosto', 'septiembre')",
+                },
                 "taxpayer_type": {
                     "type": "string",
-                    "enum": [
-                        "monotributo",
-                        "responsable_inscripto",
-                        "empleado_relacion_dependencia",
-                    ],
-                },
-                "month": {
-                    "type": "integer",
-                    "description": "Mes calendario del vencimiento (1-12)",
-                },
+                    "description": "Tipo de contribuyente (ej: 'monotributo', 'autonomo')",
+                }
             },
-            "required": ["taxpayer_type", "month"],
         },
     },
     {
@@ -103,37 +100,42 @@ def search_documents(query: str) -> dict:
         }
 
 
-DUE_DATES = {
-    "monotributo": {
-        6: [
-            {"obligation": "Pago mensual de monotributo", "due_date": "20/06/2026"},
-            {"obligation": "Recategorizacion semestral", "due_date": "20/06/2026"},
-        ],
-        7: [{"obligation": "Pago mensual de monotributo", "due_date": "21/07/2026"}],
-    },
-    "responsable_inscripto": {
-        6: [
-            {"obligation": "Declaracion mensual de IVA", "due_date": "18/06/2026"},
-            {"obligation": "Cuotas de impuesto a las ganancias", "due_date": "13/06/2026"},
-        ],
-        7: [{"obligation": "Declaracion mensual de IVA", "due_date": "17/07/2026"}],
-    },
-}
+def get_due_dates(month: str = None, taxpayer_type: str = None, **kwargs) -> dict:
+    """Devuelve las fechas de vencimiento filtradas por mes y/o tipo de contribuyente."""
+    if not DUE_DATES:
+        return {"error": "El calendario de vencimientos no esta disponible."}
+    
+    # Si no hay filtros, devolver todo (riesgo de truncamiento en LLM si es muy largo)
+    if not month and not taxpayer_type:
+        return DUE_DATES
+        
+    result = {}
+    
+    # Filtrar reglas generales
+    if taxpayer_type:
+        reglas = DUE_DATES.get("reglas_generales", {})
+        # Buscar coincidencias parciales (ej: 'monotributista' -> 'monotributo')
+        for k, v in reglas.items():
+            if k in taxpayer_type or taxpayer_type in k:
+                if "reglas_generales" not in result:
+                    result["reglas_generales"] = {}
+                result["reglas_generales"][k] = v
 
-
-def get_due_dates(taxpayer_type: str, month: int) -> dict:
-    if not isinstance(month, int) or not 1 <= month <= 12:
-        return {"error": "El mes debe ser un numero entero entre 1 y 12."}
-
-    dates = DUE_DATES.get(taxpayer_type, {}).get(month, [])
-    if not dates:
-        return {
-            "taxpayer_type": taxpayer_type,
-            "month": month,
-            "due_dates": [],
-            "note": "No hay vencimientos registrados para este periodo.",
-        }
-    return {"taxpayer_type": taxpayer_type, "month": month, "due_dates": dates}
+    # Filtrar calendario mensual
+    calendario = DUE_DATES.get("calendario_mensual_2026", {})
+    if month:
+        for k, v in calendario.items():
+            if month.lower() in k.lower():
+                result[k] = v
+                break
+    else:
+        # Si no pasaron mes, no devolver todo el calendario mensual
+        pass
+        
+    # Siempre incluir los anuales por si acaso, son pocos
+    result["vencimientos_anuales_2026"] = DUE_DATES.get("vencimientos_anuales_2026", {})
+    
+    return result or DUE_DATES
 
 
 def _write_escalation_queue(payload: dict) -> bool:
