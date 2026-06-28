@@ -20,6 +20,7 @@ class LoginResponse(BaseModel):
     access_token: str   # JWT emitido por Supabase
     user_id: str        # UUID del usuario en Supabase Auth
     role: str           # 'admin' | 'cliente' — leído de app_metadata en Supabase
+    name: str | None = None
 
 
 # ─── Chat ────────────────────────────────────────────────────────────────────

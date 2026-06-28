@@ -133,22 +133,28 @@ async def login(body: LoginRequest):
         if session is None or user is None:
             raise HTTPException(status_code=401, detail="Credenciales incorrectas.")
 
-        # Obtener el rol desde la tabla profiles
+        # Obtener el rol y nombre desde la tabla profiles
         role = "cliente"
+        name = user.email.split("@")[0] if user.email else "Usuario"
         try:
             print(f"Buscando perfil para user.id: {user.id}")
             profile_res = (
                 _supabase.table("profiles")
-                .select("role,tipo_contribuyente")
+                .select("role,tipo_contribuyente,nombre,apellido")
                 .eq("id", user.id)
                 .execute()
             )
             print(f"Respuesta Supabase perfiles: {profile_res.data}")
             if profile_res.data and len(profile_res.data) > 0:
-                role = profile_res.data[0].get("role", "cliente")
-                print(f"Rol asignado: {role}")
+                p_data = profile_res.data[0]
+                role = p_data.get("role", "cliente")
+                nombre = p_data.get("nombre", "")
+                apellido = p_data.get("apellido", "")
+                if nombre or apellido:
+                    name = f"{nombre} {apellido}".strip()
+                print(f"Rol asignado: {role}, Nombre: {name}")
             else:
-                print("No se encontró el perfil en la tabla profiles. Usando default: cliente.")
+                print("No se encontró el perfil en la tabla profiles. Usando defaults.")
         except Exception as e:
             print(f"Excepción al buscar perfil: {e}")
             pass  # Si el perfil no existe aún o hay un error, el default seguro es 'cliente'
@@ -157,6 +163,7 @@ async def login(body: LoginRequest):
             access_token=session.access_token,
             user_id=str(user.id),
             role=role,
+            name=name,
         )
 
     except AuthApiError:

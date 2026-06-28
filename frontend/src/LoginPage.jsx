@@ -31,8 +31,8 @@ export default function LoginPage() {
       }
 
       const data = await res.json()
-      // data = { access_token, user_id, role }
-      login(data.access_token, data.role ?? 'cliente', data.user_id)
+      // data = { access_token, user_id, role, name }
+      login(data.access_token, data.role ?? 'cliente', data.user_id, data.name)
 
     } catch {
       setError('No se pudo conectar con el servidor. Verificá que el backend esté activo.')
