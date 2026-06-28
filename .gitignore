@@ -222,8 +222,14 @@ __marimo__/
 
 .DS_Store
 
+<<<<<<< HEAD
 # Node dependencies
 node_modules/
 
 # Runtime escalation queue
 data/escalations.jsonl
+=======
+# Frontend Dependencies
+node_modules/
+frontend/node_modules/
+>>>>>>> ca416507d6e34bb780352976e30a75ae84fef729
