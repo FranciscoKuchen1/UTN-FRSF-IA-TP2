@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../AuthContext'
+import AlertModal from './AlertModal'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -12,6 +13,7 @@ export default function EscalationPanel() {
   // State for delete modal
   const [ticketToDelete, setTicketToDelete] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [alertMessage, setAlertMessage] = useState(null)
 
   useEffect(() => {
     fetchEscalations()
@@ -48,7 +50,7 @@ export default function EscalationPanel() {
       setEscalations(prev => prev.filter(e => e.id !== ticketToDelete))
       setTicketToDelete(null)
     } catch (err) {
-      alert(err.message)
+      setAlertMessage(err.message)
     } finally {
       setIsDeleting(false)
     }
@@ -149,6 +151,8 @@ export default function EscalationPanel() {
           </div>
         </div>
       )}
+      
+      <AlertModal isOpen={!!alertMessage} message={alertMessage} onClose={() => setAlertMessage(null)} />
     </div>
   )
 }

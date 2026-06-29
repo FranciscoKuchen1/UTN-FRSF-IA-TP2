@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 import EscalationPanel from './components/EscalationPanel'
+import AlertModal from './components/AlertModal'
+import ConfirmModal from './components/ConfirmModal'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -70,6 +72,10 @@ export default function AdminPanel() {
 
   const [activeDocuments, setActiveDocuments] = useState([])
   const [loadingDocs, setLoadingDocs] = useState(false)
+  
+  const [alertMessage, setAlertMessage] = useState(null)
+  const [confirmConfig, setConfirmConfig] = useState(null)
+  const [isProcessingDelete, setIsProcessingDelete] = useState(false)
 
   const fetchActiveDocuments = useCallback(() => {
     setLoadingDocs(true)
@@ -94,36 +100,50 @@ export default function AdminPanel() {
     }
   }, [currentTab, fetchActiveDocuments])
 
-  async function handleDeleteDocument(filename) {
-    if (!confirm(`¿Estás seguro de que deseas eliminar "${filename}" de la base de conocimiento? Esto borrará el archivo original y todos sus fragmentos indexados.`)) return
-    
-    try {
-      const res = await fetch(`${API_URL}/admin/documents/${filename}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) throw new Error('Error al eliminar')
-      
-      fetchActiveDocuments()
-    } catch (err) {
-      alert(err.message)
-    }
+  function handleDeleteDocument(filename) {
+    setConfirmConfig({
+      title: "¿Eliminar documento?",
+      message: `¿Estás seguro de que deseas eliminar "${filename}" de la base de conocimiento? Esto borrará el archivo original y todos sus fragmentos indexados.`,
+      onConfirm: async () => {
+        setIsProcessingDelete(true)
+        try {
+          const res = await fetch(`${API_URL}/admin/documents/${filename}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          if (!res.ok) throw new Error('Error al eliminar')
+          fetchActiveDocuments()
+        } catch (err) {
+          setAlertMessage(err.message)
+        } finally {
+          setIsProcessingDelete(false)
+          setConfirmConfig(null)
+        }
+      }
+    })
   }
 
-  async function handleDeleteAllDocuments() {
-    if (!confirm('¿Estás SEGURO de que deseas eliminar TODOS los documentos de la base de conocimiento? Esta acción borrará todo el texto indexado y no se puede deshacer.')) return
-    
-    try {
-      const res = await fetch(`${API_URL}/admin/documents`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) throw new Error('Error al eliminar todos los documentos')
-      
-      fetchActiveDocuments()
-    } catch (err) {
-      alert(err.message)
-    }
+  function handleDeleteAllDocuments() {
+    setConfirmConfig({
+      title: "¿Eliminar TODOS los documentos?",
+      message: "Esta acción borrará TODO el texto indexado y los archivos subidos. No se puede deshacer.",
+      onConfirm: async () => {
+        setIsProcessingDelete(true)
+        try {
+          const res = await fetch(`${API_URL}/admin/documents`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          if (!res.ok) throw new Error('Error al eliminar todos los documentos')
+          fetchActiveDocuments()
+        } catch (err) {
+          setAlertMessage(err.message)
+        } finally {
+          setIsProcessingDelete(false)
+          setConfirmConfig(null)
+        }
+      }
+    })
   }
 
   // Estado para la pestaña de configuración
@@ -200,7 +220,7 @@ export default function AdminPanel() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        alert(`Error: ${data.detail || res.status}`)
+        setAlertMessage(`Error: ${data.detail || res.status}`)
         return
       }
 
@@ -209,7 +229,7 @@ export default function AdminPanel() {
       fetchActiveDocuments()
 
     } catch {
-      alert('No se pudo contactar al servidor.')
+      setAlertMessage('No se pudo contactar al servidor.')
     } finally {
       setUploading(false)
     }
@@ -444,6 +464,20 @@ export default function AdminPanel() {
           </p>
         </div>
       </div>
+
+      <AlertModal 
+        isOpen={!!alertMessage} 
+        message={alertMessage} 
+        onClose={() => setAlertMessage(null)} 
+      />
+      <ConfirmModal 
+        isOpen={!!confirmConfig}
+        title={confirmConfig?.title}
+        message={confirmConfig?.message}
+        onConfirm={confirmConfig?.onConfirm}
+        onCancel={() => setConfirmConfig(null)}
+        isProcessing={isProcessingDelete}
+      />
     </div>
   )
 }
