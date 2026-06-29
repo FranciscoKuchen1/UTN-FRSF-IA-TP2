@@ -12,7 +12,7 @@ load_dotenv(
     override=True,
 )
 
-SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.7"))
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.5"))
 _supabase: Client | None = None
 
 
@@ -29,7 +29,7 @@ def _get_supabase() -> Client:
 
 def search_by_keywords(query: str, top_k: int = 3) -> list[dict]:
     """Fallback retrieval through PostgreSQL full-text search."""
-    cleaned_query = " ".join(
+    cleaned_query = " | ".join(
         re.findall(r"[\wáéíóúüñ]+", query, re.IGNORECASE)
     ).strip()
     if not cleaned_query:
@@ -44,12 +44,11 @@ def search_by_keywords(query: str, top_k: int = 3) -> list[dict]:
             cleaned_query,
             options={"config": "spanish", "type": "websearch"},
         )
-        .limit(top_k)
         .execute()
     )
     data: Any = response.data
     rows = data if isinstance(data, list) else []
-    return [dict(row, retrieval_method="full_text") for row in rows]
+    return [dict(row, retrieval_method="full_text") for row in rows][:top_k]
 
 
 def search_similar(query: str, top_k: int = 3) -> list[dict]:

@@ -21,8 +21,7 @@ function DocIcon() {
   )
 }
 
-/** Fila de un documento ya subido */
-function UploadedRow({ item }) {
+function UploadedRow({ item, onDelete }) {
   const ok = item.status === 'ok'
   return (
     <div className={`flex items-start gap-3 px-4 py-3 rounded-md border ${ok ? 'border-line bg-white/40' : 'border-stamp/30 bg-stamp/5'}`}>
@@ -39,9 +38,24 @@ function UploadedRow({ item }) {
           <p className="font-mono text-[11px] text-stamp mt-0.5">{item.error}</p>
         )}
       </div>
-      <span className={`font-mono text-[10px] uppercase tracking-wide shrink-0 mt-0.5 ${ok ? 'text-ledger' : 'text-stamp'}`}>
-        {ok ? 'Indexado' : 'Error'}
-      </span>
+      {ok && onDelete && (
+        <button
+          onClick={() => onDelete(item.name)}
+          className="ml-4 shrink-0 text-stamp/60 hover:text-stamp p-1.5 hover:bg-stamp/10 rounded transition-colors"
+          title="Eliminar documento"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
+        </button>
+      )}
+      {!ok && (
+        <span className="font-mono text-[10px] uppercase tracking-wide shrink-0 mt-0.5 text-stamp">
+          Error
+        </span>
+      )}
     </div>
   )
 }
@@ -87,6 +101,24 @@ export default function AdminPanel() {
       })
       if (!res.ok) throw new Error('Error al eliminar')
       
+      setUploadedFiles(prev => prev.filter(f => f.name !== filename))
+      fetchActiveDocuments()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function handleDeleteAllDocuments() {
+    if (!confirm('¿Estás SEGURO de que deseas eliminar TODOS los documentos de la base de conocimiento? Esta acción borrará todo el texto indexado y no se puede deshacer.')) return
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/documents`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Error al eliminar todos los documentos')
+      
+      setUploadedFiles([])
       fetchActiveDocuments()
     } catch (err) {
       alert(err.message)
@@ -138,8 +170,8 @@ export default function AdminPanel() {
     if (!allowed.includes(file.type) && !allowedExt.includes(ext)) {
       return `"${file.name}" no es un PDF ni un .docx válido.`
     }
-    if (file.size > 20 * 1024 * 1024) {
-      return `"${file.name}" supera el límite de 20 MB.`
+    if (file.size > 50 * 1024 * 1024) {
+      return `"${file.name}" supera el límite de 50 MB.`
     }
     return null
   }
@@ -207,13 +239,13 @@ export default function AdminPanel() {
   function onDrop(e) {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) uploadFile(file)
+    const files = Array.from(e.dataTransfer.files)
+    files.forEach(file => uploadFile(file))
   }
 
   function onFileInputChange(e) {
-    const file = e.target.files[0]
-    if (file) uploadFile(file)
+    const files = Array.from(e.target.files)
+    files.forEach(file => uploadFile(file))
     e.target.value = ''   // permite seleccionar el mismo archivo dos veces
   }
 
@@ -300,7 +332,7 @@ export default function AdminPanel() {
                     : 'Arrastrá un archivo PDF o Word acá, o hacé clic para seleccionar'}
                 </p>
                 <p className="font-mono text-[11px] text-ink/40 uppercase tracking-wide">
-                  .pdf · .docx · máx. 20 MB
+                  .pdf · .docx · máx. 50 MB
                 </p>
 
                 {/* Input oculto */}
@@ -321,6 +353,7 @@ export default function AdminPanel() {
                     type="file"
                     accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     className="hidden"
+                    multiple
                     disabled={uploading}
                     onChange={onFileInputChange}
                   />
@@ -342,7 +375,7 @@ export default function AdminPanel() {
                   </h2>
                   <div className="flex flex-col gap-2">
                     {uploadedFiles.map((item, i) => (
-                      <UploadedRow key={i} item={item} />
+                      <UploadedRow key={i} item={item} onDelete={handleDeleteDocument} />
                     ))}
                   </div>
                 </section>
@@ -354,9 +387,14 @@ export default function AdminPanel() {
                   <h2 className="font-mono text-[11px] uppercase tracking-widest text-ink/50">
                     Base de Conocimiento Actual
                   </h2>
-                  <button onClick={fetchActiveDocuments} className="text-xs text-ink/50 hover:text-ink">
-                    Actualizar
-                  </button>
+                  <div className="flex gap-4">
+                    <button onClick={handleDeleteAllDocuments} className="text-xs text-stamp hover:text-stamp/80 font-medium transition-colors">
+                      Eliminar Todos
+                    </button>
+                    <button onClick={fetchActiveDocuments} className="text-xs text-ink/50 hover:text-ink transition-colors">
+                      Actualizar
+                    </button>
+                  </div>
                 </div>
                 
                 {loadingDocs ? (
