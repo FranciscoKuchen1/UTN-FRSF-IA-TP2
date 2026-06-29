@@ -55,6 +55,44 @@ export default function AdminPanel() {
   const [dropError, setDropError] = useState(null)
   const [currentTab, setCurrentTab] = useState('upload')
 
+  const [activeDocuments, setActiveDocuments] = useState([])
+  const [loadingDocs, setLoadingDocs] = useState(false)
+
+  const fetchActiveDocuments = useCallback(() => {
+    setLoadingDocs(true)
+    fetch(`${API_URL}/admin/documents`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setActiveDocuments(data)
+      })
+      .catch(console.error)
+      .finally(() => setLoadingDocs(false))
+  }, [token])
+
+  useEffect(() => {
+    if (currentTab === 'upload') {
+      fetchActiveDocuments()
+    }
+  }, [currentTab, fetchActiveDocuments])
+
+  async function handleDeleteDocument(filename) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar "${filename}" de la base de conocimiento? Esto borrará el archivo original y todos sus fragmentos indexados.`)) return
+    
+    try {
+      const res = await fetch(`${API_URL}/admin/documents/${filename}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Error al eliminar')
+      
+      fetchActiveDocuments()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
   // Estado para la pestaña de configuración
   const [contactInfo, setContactInfo] = useState('')
   const [savingContact, setSavingContact] = useState(false)
@@ -145,6 +183,8 @@ export default function AdminPanel() {
         chunks: data.chunks_generados ?? '—',
         status: 'ok',
       }])
+      
+      fetchActiveDocuments()
 
     } catch {
       setUploadedFiles(prev => [...prev, {
@@ -307,6 +347,51 @@ export default function AdminPanel() {
                   </div>
                 </section>
               )}
+
+              {/* Documentos Activos en la Base de Conocimiento */}
+              <section className="mt-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-mono text-[11px] uppercase tracking-widest text-ink/50">
+                    Base de Conocimiento Actual
+                  </h2>
+                  <button onClick={fetchActiveDocuments} className="text-xs text-ink/50 hover:text-ink">
+                    Actualizar
+                  </button>
+                </div>
+                
+                {loadingDocs ? (
+                  <p className="text-sm text-ink/40 font-body">Cargando documentos...</p>
+                ) : activeDocuments.length === 0 ? (
+                  <p className="text-sm text-ink/40 font-body">No hay documentos en la base de conocimiento.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {activeDocuments.map((doc, i) => (
+                      <div key={i} className="flex items-center justify-between px-4 py-3 rounded-md border border-line bg-white/40">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-ledger"><DocIcon /></span>
+                          <div className="min-w-0">
+                            <p className="font-body text-sm text-ink font-medium truncate">{doc.name}</p>
+                            <p className="font-mono text-[10px] text-ink/40 mt-0.5">
+                              Subido: {new Date(doc.created_at || doc.updated_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteDocument(doc.name)}
+                          className="ml-4 shrink-0 text-stamp/60 hover:text-stamp p-1.5 hover:bg-stamp/10 rounded transition-colors"
+                          title="Eliminar documento"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            <line x1="10" y1="11" x2="10" y2="17" />
+                            <line x1="14" y1="11" x2="14" y2="17" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             </>) : currentTab === 'escalations' ? (
             <div className="-mx-6 -my-4">
               <EscalationPanel />

@@ -296,6 +296,25 @@ async def upload_document(
             
         # Llamar al flujo de ingestión
         summary = ingest_document(temp_path, source_name=filename)
+        
+        # Subir a Supabase Storage
+        user_client = admin_data["client"]
+        content_type = "application/pdf"
+        if extension == ".docx":
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif extension == ".txt":
+            content_type = "text/plain"
+            
+        try:
+            user_client.storage.from_("knowledge_base").upload(
+                file=contents,
+                path=filename,
+                file_options={"content-type": content_type, "upsert": "true"}
+            )
+        except Exception as e:
+            # Opcional: Podríamos revertir la ingestión aquí, pero lo reportamos
+            print(f"[WARN] Error al subir original a Storage: {e}")
+            
         return {"status": "success", "filename": filename, **summary}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -309,6 +328,36 @@ async def upload_document(
     finally:
         if temp_path:
             Path(temp_path).unlink(missing_ok=True)
+
+
+@app.get("/admin/documents", tags=["Admin"])
+async def get_documents(admin_data=Depends(get_current_admin)):
+    """Obtiene la lista de documentos en la base de conocimiento desde Storage."""
+    try:
+        user_client = admin_data["client"]
+        res = user_client.storage.from_("knowledge_base").list()
+        # Filtramos posibles archivos ocultos o carpetas
+        files = [f for f in res if f.get("name") and not f["name"].startswith(".empty")]
+        return files
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo documentos: {str(e)}")
+
+
+@app.delete("/admin/documents/{filename}", tags=["Admin"])
+async def delete_document(filename: str, admin_data=Depends(get_current_admin)):
+    """Elimina un documento de Storage y sus chunks de la base de datos."""
+    try:
+        user_client = admin_data["client"]
+        
+        # Eliminar de Storage
+        user_client.storage.from_("knowledge_base").remove([filename])
+        
+        # Eliminar de BD (limpiar chunks)
+        user_client.table("documentos").delete().eq("source", filename).execute()
+        
+        return {"status": "success", "message": f"{filename} eliminado."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error eliminando documento: {str(e)}")
 
 
 @app.get("/admin/escalations", response_model=list[EscalationResponse], tags=["Admin"])
