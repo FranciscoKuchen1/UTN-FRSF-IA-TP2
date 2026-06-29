@@ -242,6 +242,16 @@ async def chat(
 
     try:
         response = agent.chat(body.message)
+        
+        # Persistir la conversacion en Supabase
+        try:
+            _supabase.table("chat_messages").insert([
+                {"user_id": user_id, "role": "user", "content": body.message},
+                {"user_id": user_id, "role": "assistant", "content": response}
+            ]).execute()
+        except Exception as e:
+            print(f"[WARN] Error guardando historial de chat: {e}")
+
     except RuntimeError as e:
         # Errores conocidos del agente (cuota agotada, credenciales, etc.)
         raise HTTPException(status_code=502, detail=str(e))
@@ -249,6 +259,19 @@ async def chat(
         raise HTTPException(status_code=500, detail="Error interno del agente.")
 
     return ChatResponse(response=response, session_id=user_id)
+
+@app.get("/chat/history", tags=["Chat"])
+async def get_chat_history(current_user=Depends(get_current_user)):
+    """Obtiene el historial de chat persistido del cliente."""
+    try:
+        res = _supabase.table("chat_messages")\
+            .select("role,content,created_at")\
+            .eq("user_id", str(current_user.id))\
+            .order("created_at", desc=False)\
+            .execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo historial: {str(e)}")
 
 
 @app.delete("/chat", tags=["Chat"])
@@ -476,3 +499,35 @@ async def update_contact_settings(
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error actualizando settings: {str(e)}")
+
+@app.get("/admin/clients", tags=["Admin"])
+async def get_clients_list(admin_data=Depends(get_current_admin)):
+    """Obtiene una lista de todos los clientes para auditoria."""
+    try:
+        res = _supabase.table("v_clientes").select("id, nombre, apellido, email").execute()
+        clients = []
+        for p in res.data:
+            nombre = p.get("nombre") or ""
+            apellido = p.get("apellido") or ""
+            full_name = f"{nombre} {apellido}".strip() or "Usuario sin nombre"
+            clients.append({
+                "id": p["id"],
+                "name": full_name,
+                "email": p.get("email", "")
+            })
+        return clients
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo clientes: {str(e)}")
+
+@app.get("/admin/chats/{user_id}", tags=["Admin"])
+async def get_client_chat_history(user_id: str, admin_data=Depends(get_current_admin)):
+    """Obtiene el historial completo de un cliente específico para auditoria."""
+    try:
+        res = _supabase.table("chat_messages")\
+            .select("role,content,created_at")\
+            .eq("user_id", user_id)\
+            .order("created_at", desc=False)\
+            .execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo historial de cliente: {str(e)}")

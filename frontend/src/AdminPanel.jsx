@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext'
 import EscalationPanel from './components/EscalationPanel'
 import AlertModal from './components/AlertModal'
 import ConfirmModal from './components/ConfirmModal'
+import ClientChatsPanel from './components/ClientChatsPanel'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -285,6 +286,13 @@ export default function AdminPanel() {
               Configuración
               {currentTab === 'settings' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brass rounded-t-sm" />}
             </button>
+            <button
+              className={`pb-3 text-sm font-medium transition-colors relative ${currentTab === 'auditoria' ? 'text-ink' : 'text-ink/50 hover:text-ink'}`}
+              onClick={() => setCurrentTab('auditoria')}
+            >
+              Auditoría de Chats
+              {currentTab === 'auditoria' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brass rounded-t-sm" />}
+            </button>
           </div>
 
           {currentTab === 'upload' ? (
@@ -427,6 +435,22 @@ export default function AdminPanel() {
             <div className="-mx-6 -my-4">
               <EscalationPanel />
             </div>
+          ) : currentTab === 'auditoria' ? (
+            <>
+              <header className="mb-6">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-stamp mb-1">
+                      Auditoría
+                    </p>
+                    <h1 className="font-display text-2xl md:text-3xl text-ink font-semibold">
+                      Historiales de Chat
+                    </h1>
+                  </div>
+                </div>
+              </header>
+              <ClientChatsPanel token={token} />
+            </>
           ) : (
             <div>
               <header className="mb-6">

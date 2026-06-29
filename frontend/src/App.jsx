@@ -114,6 +114,25 @@ export default function App() {
   const scrollRef = useRef(null)
 
   useEffect(() => {
+    async function loadHistory() {
+      try {
+        const res = await fetch(`${API_URL}/chat/history`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data && data.length > 0) {
+            setMessages(prev => [prev[0], ...data])
+          }
+        }
+      } catch (err) {
+        console.error("Error cargando historial de chat", err)
+      }
+    }
+    loadHistory()
+  }, [token])
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
