@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAuth } from './AuthContext'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // Detecta si la respuesta menciona una fuente documental
 function extraerFuente(texto) {
+  if (!texto || typeof texto !== 'string') return null
   const match = texto.match(/\(?[Ff]uente:\s*([^).\n]+)\)?/)
   return match ? match[1].trim() : null
 }
@@ -50,7 +52,9 @@ function SourceBadge({ source }) {
 
 function Message({ role, content }) {
   const isUser = role === 'user'
-  const source = !isUser ? extraerFuente(content) : null
+  const safeContent = typeof content === 'string' ? content : ''
+  const source = !isUser ? extraerFuente(safeContent) : null
+  const displayContent = !isUser && source ? safeContent.replace(/\(?[Ff]uente:\s*([^).\n]+)\)?/, '').trim() : safeContent
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -63,7 +67,15 @@ function Message({ role, content }) {
               : 'bg-white/70 text-ink border border-line rounded-lg rounded-tl-sm px-4 py-2.5 font-body text-[15px] leading-relaxed shadow-sm'
           }
         >
-          {content}
+          {isUser ? (
+            displayContent
+          ) : (
+            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:my-2 prose-headings:text-ink prose-strong:text-ink prose-a:text-stamp">
+              <ReactMarkdown>
+                {displayContent}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
         {source && <SourceBadge source={source} />}
       </div>
