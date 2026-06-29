@@ -1,162 +1,380 @@
 import json
+import inspect
 import os
 import re
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from dotenv import load_dotenv
-load_dotenv()
 
-from agent.tools import TOOLS_SCHEMA, ejecutar_tool
-from agent.memory import ShortTermMemory, LongTermMemory
+load_dotenv(
+    dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"),
+    override=True,
+)
+
+import groq
+from groq import AuthenticationError, PermissionDeniedError, RateLimitError
+
+from agent.memory import LongTermMemory, ShortTermMemory
 from agent.prompts import SYSTEM_PROMPT
+from agent.tools import TOOLS_SCHEMA, execute_tool
 from observability.logger import LangfuseLogger
 
-from google import genai
-from google.genai.errors import ClientError
 
-genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+LLM_MODEL = os.getenv("LLM_MODEL") or "qwen/qwen3-32b"
+MAX_ITER = int(os.getenv("MAX_REACT_ITERATIONS", "5"))
 
-MAX_ITER = int(os.getenv("MAX_REACT_ITERATIONS", 5))
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+_PROTOCOL_ONLY_RE = re.compile(
+    r"^\s*(?:thought|observation)\s*:", re.IGNORECASE
+)
 
 
 class ReActAgent:
+    """ReAct agent with textual tool calls and a safe escalation fallback."""
 
-    def __init__(self, cliente_id: str = "anonimo"):
-        self.cliente_id = cliente_id
-        self.short_mem = ShortTermMemory()
-        self.long_mem = LongTermMemory()
-        self.logger = LangfuseLogger(session_id=cliente_id)
+    def __init__(
+        self,
+        client_id: str = "anonymous",
+        *,
+        taxpayer_type: str | None = None,
+        llm_callable: Callable[[list[dict]], str] | None = None,
+        tool_executor: Callable[[str, dict, dict | None], str] = execute_tool,
+        short_memory: ShortTermMemory | None = None,
+        long_memory: LongTermMemory | None = None,
+        logger: LangfuseLogger | None = None,
+    ):
+        self.client_id = client_id
+        self.short_mem = short_memory or ShortTermMemory()
+        self.long_mem = long_memory or LongTermMemory()
+        self.logger = logger or LangfuseLogger(session_id=client_id)
+        self._llm_callable = llm_callable
+        self._tool_executor = tool_executor
+        self._groq_client = None
+
+        if taxpayer_type:
+            self.long_mem.update_taxpayer_type(client_id, taxpayer_type)
+
+    def _get_groq_client(self):
+        if self._groq_client is not None:
+            return self._groq_client
+
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY no esta configurada.")
+
+        self._groq_client = groq.Client(api_key=api_key)
+        return self._groq_client
 
     def _build_system(self) -> str:
-        perfil = self.long_mem.obtener_perfil(self.cliente_id) or {}
+        profile = self.long_mem.get_profile(self.client_id) or {}
         return SYSTEM_PROMPT.format(
-            tipo_contribuyente=perfil.get("tipo_contribuyente", "no informado"),
-            fecha_actual=datetime.now().strftime("%d/%m/%Y")
+            taxpayer_type=profile.get("taxpayer_type", "no informado"),
+            current_date=datetime.now().strftime("%d/%m/%Y"),
         )
 
     def _call_llm(self, messages: list[dict]) -> str:
-        """Llama al LLM (Gemini) y retorna el texto generado."""
+        """Call the configured LLM and return its textual ReAct output."""
         self.logger.log_llm_call(messages)
 
         try:
-            # Gemini no tiene rol "system" nativo en este formato simple;
-            # se concatena todo el contexto como un único prompt de texto.
-            prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
-            response = genai_client.models.generate_content(
-                model=LLM_MODEL,
-                contents=prompt
-            )
-            text = response.text or ""
+            if self._llm_callable is not None:
+                text = self._llm_callable(messages) or ""
+            else:
+                response = self._get_groq_client().chat.completions.create(
+                    model=LLM_MODEL,
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.2,
+                )
+                choice = response.choices[0] if response.choices else None
+                text = (
+                    getattr(getattr(choice, "message", None), "content", "")
+                    if choice is not None
+                    else ""
+                )
+                text = text or ""
 
             self.logger.log_llm_response(text)
             return text
-        except ClientError as e:
-            # Manejar errores de API de Gemini (cuotas, credenciales, etc)
-            error_detail = str(e)
-            if "429" in error_detail or "RESOURCE_EXHAUSTED" in error_detail:
-                raise RuntimeError(
-                    "Los créditos de API de Google Generative AI se han agotado. "
-                    "Accede a https://ai.studio/projects para recargar tu cuenta."
-                )
-            elif "401" in error_detail or "UNAUTHENTICATED" in error_detail:
-                raise RuntimeError("Credenciales inválidas de Google Generative AI. Verifica GEMINI_API_KEY.")
-            elif "403" in error_detail or "PERMISSION_DENIED" in error_detail:
-                raise RuntimeError("Permisos insuficientes en la API de Google Generative AI.")
-            else:
-                raise RuntimeError(f"Error de API Gemini: {error_detail}")
+        except RateLimitError as exc:
+            raise RuntimeError(
+                "La API de Groq alcanzo su limite de uso o no tiene creditos disponibles."
+            ) from exc
+        except AuthenticationError as exc:
+            raise RuntimeError("Las credenciales de Groq no son validas.") from exc
+        except PermissionDeniedError as exc:
+            raise RuntimeError("La API de Groq rechazo la solicitud por permisos.") from exc
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"Error al consultar Groq: {exc}") from exc
 
-    def _parse_action(self, llm_output: str) -> tuple[str | None, dict | None, str | None]:
-        """
-        Extrae Action y Action Input del output del LLM.
-        Retorna (tool_name, params, final_answer)
-        """
-        # Detectar respuesta final
-        final_match = re.search(r"Final Answer:\s*(.+)", llm_output, re.DOTALL)
+    @staticmethod
+    def _visible_output(llm_output: str) -> str:
+        """Remove model reasoning blocks so they are never returned to the user."""
+        visible = _THINK_BLOCK_RE.sub("", llm_output or "")
+        if re.search(r"<think>", visible, re.IGNORECASE):
+            visible = re.split(r"<think>", visible, maxsplit=1, flags=re.IGNORECASE)[0]
+        return visible.strip()
+
+    @staticmethod
+    def _decode_action_input(text: str) -> dict | None:
+        input_match = re.search(r"action input\s*:\s*", text, re.IGNORECASE)
+        if not input_match:
+            return None
+
+        raw_params = text[input_match.end():].lstrip()
+        try:
+            params, _ = json.JSONDecoder().raw_decode(raw_params)
+        except json.JSONDecodeError:
+            return None
+        return params if isinstance(params, dict) else None
+
+    def _parse_action(
+        self, llm_output: str
+    ) -> tuple[str | None, dict | None, str | None]:
+        """Parse a tool action or a user-facing final answer from model output."""
+        visible = self._visible_output(llm_output)
+        if not visible:
+            return None, None, None
+
+        final_match = re.search(
+            r"final answer\s*:\s*(.+)", visible, re.IGNORECASE | re.DOTALL
+        )
         if final_match:
-            return None, None, final_match.group(1).strip()
+            answer = final_match.group(1).strip()
+            return (None, None, answer) if answer else (None, None, None)
 
-        # Detectar action
-        action_match = re.search(r"Action:\s*(\w+)", llm_output)
-        input_match = re.search(r"Action Input:\s*(\{.+?\})", llm_output, re.DOTALL)
+        action_match = re.search(
+            r"(?:^|\n)\s*action\s*:\s*([A-Za-z_]\w*)",
+            visible,
+            re.IGNORECASE,
+        )
+        if action_match:
+            params = self._decode_action_input(visible)
+            if params is None:
+                return None, None, None
+            return action_match.group(1), params, None
 
-        if action_match and input_match:
-            tool_name = action_match.group(1).strip()
+        # Some models answer directly even when a protocol marker was requested.
+        # Accept that answer, but never expose a raw Thought/Observation block.
+        if not _PROTOCOL_ONLY_RE.match(visible):
+            return None, None, visible
+
+        return None, None, None
+
+    @staticmethod
+    def _decode_tool_result(raw_result: Any) -> dict:
+        if isinstance(raw_result, dict):
+            return raw_result
+        if isinstance(raw_result, str):
             try:
-                params = json.loads(input_match.group(1))
+                parsed = json.loads(raw_result)
+                return parsed if isinstance(parsed, dict) else {"result": parsed}
             except json.JSONDecodeError:
-                params = {}
-            return tool_name, params, None
+                return {"result": raw_result}
+        return {"result": raw_result}
 
-        # Si el LLM no siguió el formato, forzar respuesta final
-        return None, None, llm_output.strip()
+    def _execute_tool_safely(self, name: str, params: dict, context: dict | None = None) -> str:
+        try:
+            try:
+                inspect.signature(self._tool_executor).bind(name, params, context)
+            except (TypeError, ValueError):
+                # Backward compatibility for custom/test executors with two arguments.
+                result = self._tool_executor(name, params)
+            else:
+                result = self._tool_executor(name, params, context)
+            return result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+        except Exception as exc:
+            return json.dumps(
+                {
+                    "error": f"La herramienta {name} no pudo ejecutarse.",
+                    "error_type": type(exc).__name__,
+                },
+                ensure_ascii=False,
+            )
+
+    @classmethod
+    def _log_tool_provenance(cls, tool_name: str, raw_result: Any) -> None:
+        """Print a concise, human-readable account of each tool's data source."""
+        payload = cls._decode_tool_result(raw_result)
+
+        if tool_name == "search_documents":
+            fragments = payload.get("fragments") or []
+            if not fragments:
+                detail = payload.get("message") or payload.get("error") or "sin resultados"
+                print(f"[FUENTES][RAG] No se recuperaron documentos: {detail}")
+                return
+
+            print(f"[FUENTES][RAG] Documentos recuperados: {len(fragments)}")
+            for position, fragment in enumerate(fragments, start=1):
+                source = fragment.get("source") or "Fuente no informada"
+                chunk = fragment.get("chunk_index")
+                method = fragment.get("retrieval_method") or "no informado"
+                similarity = fragment.get("similarity")
+                excerpt = " ".join(str(fragment.get("text") or "").split())[:180]
+
+                metadata = [f"metodo={method}"]
+                if chunk is not None:
+                    metadata.append(f"fragmento={chunk}")
+                if isinstance(similarity, (int, float)):
+                    metadata.append(f"similitud={similarity:.3f}")
+
+                print(
+                    f"[FUENTES][RAG][{position}] archivo={source} | "
+                    f"{' | '.join(metadata)}"
+                )
+                if excerpt:
+                    print(f"[FUENTES][RAG][{position}] extracto={excerpt}")
+            return
+
+        internal_sources = {
+            "get_due_dates": "agent/tools.py::DUE_DATES (tabla interna de vencimientos)",
+            "get_current_datetime": "reloj del sistema (zona America/Argentina/Buenos_Aires)",
+            "escalate_query": "historial de la conversacion y configuracion de Supabase",
+        }
+        source = internal_sources.get(tool_name, "origen no documentado")
+        print(f"[FUENTES][{tool_name}] base={source}")
+
+    def _escalate(self, reason: str, user_message: str) -> str:
+        context = {
+            "client_id": self.client_id,
+            "history": self.short_mem.get_history(),
+            "llm_callable": self._call_llm  # Pass the LLM callable so the tool can use it with observability
+        }
+        result = self._execute_tool_safely(
+            "escalate_query",
+            {"reason": reason, "client_data": user_message},
+            context
+        )
+        payload = self._decode_tool_result(result)
+        return payload.get("message") or (
+            "No pude completar tu consulta automaticamente. "
+            "Por favor, comunicate con el estudio contable."
+        )
 
     def chat(self, user_message: str) -> str:
-        """Punto de entrada principal. Ejecuta el loop ReAct y devuelve la respuesta."""
+        """Run the ReAct loop and return one safe, user-facing response."""
+        user_message = (user_message or "").strip()
+        if not user_message:
+            return "Escribi una consulta para que pueda ayudarte."
 
-        # Agregar mensaje del usuario al historial
+        self._extract_and_save_profile(user_message)
+        
+        # Verificar si falta taxpayer_type
+        profile = self.long_mem.get_profile(self.client_id) or {}
+        if not profile.get("taxpayer_type"):
+            msg = "¡Hola! Antes de responder tu consulta, necesito que me digas tu condición fiscal (ej: Monotributista, Responsable Inscripto) para poder ayudarte de manera precisa."
+            self.short_mem.add("user", user_message)
+            self.short_mem.add("assistant", msg)
+            return msg
+
         self.short_mem.add("user", user_message)
 
-        # Armar contexto completo
-        system = self._build_system()
         tools_desc = json.dumps(TOOLS_SCHEMA, ensure_ascii=False, indent=2)
-
-        # Construir lista de mensajes para el LLM
         messages = [
-            {"role": "system", "content": f"{system}\n\nHerramientas disponibles (JSON Schema):\n{tools_desc}"},
-            *self.short_mem.get_history()
+            {
+                "role": "system",
+                "content": f"{self._build_system()}\n\nHerramientas (JSON Schema):\n{tools_desc}",
+            },
+            *self.short_mem.get_history(),
         ]
 
         final_answer = None
-        scratchpad = ""  # acumula el razonamiento de esta vuelta
+        had_progress = False
 
         for iteration in range(MAX_ITER):
-            # Si hay scratchpad de iteraciones anteriores, agregarlo
-            if scratchpad:
-                messages_with_scratch = messages[:-1] + [
-                    {"role": "assistant", "content": scratchpad},
-                    messages[-1]
-                ]
-            else:
-                messages_with_scratch = messages
+            try:
+                llm_output = self._call_llm(messages)
+            except RuntimeError as exc:
+                final_answer = self._escalate(
+                    f"llm_error:{type(exc).__name__}", user_message
+                )
+                break
 
-            llm_output = self._call_llm(messages_with_scratch)
-            scratchpad += llm_output + "\n"
-
+            print(f"[REACT][iteration {iteration + 1}] {llm_output.strip()}")
             tool_name, params, answer = self._parse_action(llm_output)
 
             if answer:
-                # El LLM llegó a una respuesta final
+                if not had_progress:
+                    print(
+                        "[FUENTES][LLM] Respuesta directa del modelo; "
+                        "no se consultaron documentos ni herramientas."
+                    )
                 final_answer = answer
                 break
 
             if tool_name:
-                # Ejecutar la tool
-                observation = ejecutar_tool(tool_name, params or {})
-                scratchpad += f"Observation: {observation}\n"
+                had_progress = True
+                context = {
+                    "client_id": self.client_id,
+                    "history": self.short_mem.get_history(),
+                    "llm_callable": self._call_llm
+                }
+                observation = self._execute_tool_safely(tool_name, params or {}, context)
+                print(f"[REACT][observation] {observation}")
+                self._log_tool_provenance(tool_name, observation)
 
-                # Detectar si el cliente mencionó su tipo de contribuyente
-                self._extract_and_save_profile(user_message, observation)
+                if tool_name == "escalate_query":
+                    payload = self._decode_tool_result(observation)
+                    final_answer = payload.get("message") or (
+                        "La consulta fue derivada para revision profesional."
+                    )
+                    break
 
-        # Fallback si se agotaron las iteraciones
+                action_text = self._visible_output(llm_output)
+                messages.extend(
+                    [
+                        {"role": "assistant", "content": action_text},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Observation: {observation}\n"
+                                "Continua el ciclo ReAct. Usa otra herramienta o responde "
+                                "con 'Final Answer:'."
+                            ),
+                        },
+                    ]
+                )
+                continue
+
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "La salida anterior no respeto el protocolo. Responde unicamente con "
+                        "'Action:' y 'Action Input:' o con 'Final Answer:'."
+                    ),
+                }
+            )
+
         if not final_answer:
-            if scratchpad:
-                final_answer = "No pude completar tu consulta automáticamente. La derivé al contador para que te contacte."
-                ejecutar_tool("escalar_consulta", {
-                    "motivo": "timeout_react_loop",
-                    "datos_cliente": user_message
-                })
-            else:
-                final_answer = "Ocurrió un error inesperado. Por favor, intentá de nuevo."
+            reason = "react_loop_exhausted" if had_progress else "invalid_llm_format"
+            final_answer = self._escalate(reason, user_message)
 
-        # Guardar respuesta en historial
         self.short_mem.add("assistant", final_answer)
         return final_answer
 
-    def _extract_and_save_profile(self, user_msg: str, observation: str):
-        """Detecta menciones de tipo de contribuyente y lo guarda en memoria persistente."""
+    def _extract_and_save_profile(self, user_msg: str):
+        """Persist an explicitly stated or unambiguous taxpayer type."""
+        # Evitar sobrescribir si ya lo tenemos guardado
+        profile = self.long_mem.get_profile(self.client_id) or {}
+        if profile.get("taxpayer_type"):
+            return
+
         msg_lower = user_msg.lower()
-        if "monotributo" in msg_lower:
-            self.long_mem.actualizar_tipo_contribuyente(self.cliente_id, "monotributo")
-        elif "responsable inscripto" in msg_lower or "iva" in msg_lower:
-            self.long_mem.actualizar_tipo_contribuyente(self.cliente_id, "responsable_inscripto")
+        taxpayer_type = None
+
+        if "monotribut" in msg_lower:
+            taxpayer_type = "monotributo"
+        elif "responsable inscripto" in msg_lower:
+            taxpayer_type = "responsable_inscripto"
+        elif "empleado en relacion de dependencia" in msg_lower:
+            taxpayer_type = "empleado_relacion_dependencia"
+        elif re.search(r"\b(?:declaracion|declaraci[oó]n)\s+(?:mensual\s+)?de\s+iva\b", msg_lower):
+            taxpayer_type = "responsable_inscripto"
+
+        if taxpayer_type:
+            self.long_mem.update_taxpayer_type(self.client_id, taxpayer_type)

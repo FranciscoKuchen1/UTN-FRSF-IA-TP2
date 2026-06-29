@@ -1,29 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import { useAuth } from './AuthContext'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-function getOrCreateSessionId() {
-  let id = sessionStorage.getItem('session_id')
-  if (!id) {
-    id = 'web-' + Math.random().toString(36).slice(2, 10)
-    sessionStorage.setItem('session_id', id)
-  }
-  return id
-}
-
-// Detecta si la respuesta del agente menciona una fuente documental
-// (heurística simple para mostrar el "sello" de fuente en la UI;
-// en una iteración futura el backend podría devolver esto como campo estructurado).
+// Detecta si la respuesta menciona una fuente documental
 function extraerFuente(texto) {
+  if (!texto || typeof texto !== 'string') return null
   const match = texto.match(/\(?[Ff]uente:\s*([^).\n]+)\)?/)
   return match ? match[1].trim() : null
 }
 
-const SUGERENCIAS = [
+const SUGGESTIONS = [
   '¿Cuándo vence mi declaración de IVA este mes?',
   '¿Qué documentación necesito para inscribirme como responsable inscripto?',
   '¿En qué categoría de monotributo entro si facturo $15M al año?',
 ]
+
+// ── Sub-componentes ──────────────────────────────────────────────────────────
 
 function Avatar({ role }) {
   if (role === 'user') {
@@ -44,21 +38,23 @@ function Avatar({ role }) {
   )
 }
 
-function FuenteSello({ fuente }) {
+function SourceBadge({ source }) {
   return (
     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 border border-stamp/40 text-stamp text-[11px] font-mono uppercase tracking-wide rotate-[-0.4deg] rounded-sm">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6" />
       </svg>
-      fuente · {fuente}
+      fuente · {source}
     </div>
   )
 }
 
 function Message({ role, content }) {
   const isUser = role === 'user'
-  const fuente = !isUser ? extraerFuente(content) : null
+  const safeContent = typeof content === 'string' ? content : ''
+  const source = !isUser ? extraerFuente(safeContent) : null
+  const displayContent = !isUser && source ? safeContent.replace(/\(?[Ff]uente:\s*([^).\n]+)\)?/, '').trim() : safeContent
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -71,9 +67,17 @@ function Message({ role, content }) {
               : 'bg-white/70 text-ink border border-line rounded-lg rounded-tl-sm px-4 py-2.5 font-body text-[15px] leading-relaxed shadow-sm'
           }
         >
-          {content}
+          {isUser ? (
+            displayContent
+          ) : (
+            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:my-2 prose-headings:text-ink prose-strong:text-ink prose-a:text-stamp">
+              <ReactMarkdown>
+                {displayContent}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
-        {fuente && <FuenteSello fuente={fuente} />}
+        {source && <SourceBadge source={source} />}
       </div>
     </div>
   )
@@ -92,8 +96,11 @@ function TypingIndicator() {
   )
 }
 
+// ── Componente principal ─────────────────────────────────────────────────────
+
 export default function App() {
-  const [sessionId] = useState(getOrCreateSessionId)
+  const { token, userId, name, logout } = useAuth()
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -107,14 +114,33 @@ export default function App() {
   const scrollRef = useRef(null)
 
   useEffect(() => {
+    async function loadHistory() {
+      try {
+        const res = await fetch(`${API_URL}/chat/history`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data && data.length > 0) {
+            setMessages(prev => [prev[0], ...data])
+          }
+        }
+      } catch (err) {
+        console.error("Error cargando historial de chat", err)
+      }
+    }
+    loadHistory()
+  }, [token])
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
-  async function enviarMensaje(texto) {
-    const mensaje = texto.trim()
-    if (!mensaje || loading) return
+  async function sendMessage(text) {
+    const message = text.trim()
+    if (!message || loading) return
 
-    setMessages((prev) => [...prev, { role: 'user', content: mensaje }])
+    setMessages((prev) => [...prev, { role: 'user', content: message }])
     setInput('')
     setLoading(true)
     setError(null)
@@ -122,18 +148,25 @@ export default function App() {
     try {
       const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message: mensaje }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,  // JWT — el backend extrae el user_id
+        },
+        body: JSON.stringify({ message }),  // sin session_id
       })
 
+      if (res.status === 401) {
+        logout()
+        return
+      }
       if (!res.ok) {
-        throw new Error(`El servidor respondió con estado ${res.status}`)
+        throw new Error(`The server responded with status ${res.status}`)
       }
 
       const data = await res.json()
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.response }])
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
     } catch (err) {
-      setError('No se pudo contactar al asistente. Verificá que el backend esté corriendo en ' + API_URL)
+      setError('No se pudo contactar al asistente. Verificá que el backend esté corriendo.')
     } finally {
       setLoading(false)
     }
@@ -141,14 +174,16 @@ export default function App() {
 
   function handleSubmit(e) {
     e.preventDefault()
-    enviarMensaje(input)
+    sendMessage(input)
   }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-6 md:py-10">
       <div className="w-full max-w-2xl flex flex-col h-[88vh]">
 
-        {/* Encabezado tipo carátula de expediente */}
+        {/* Header styled like an accounting file cover */}
         <header className="border-b-2 border-ink/80 pb-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
@@ -159,14 +194,21 @@ export default function App() {
                 Asistente Virtual
               </h1>
             </div>
-            <div className="text-right font-mono text-[11px] text-ink/50">
-              <p>sesión</p>
-              <p className="text-ink/70">{sessionId}</p>
+            <div className="flex flex-col items-end gap-2">
+              <span className="font-mono text-[10px] text-ink/40 truncate max-w-[140px]">
+                {name}
+              </span>
+              <button
+                onClick={logout}
+                className="font-body text-xs text-ink/50 border border-line rounded px-2.5 py-1 hover:border-stamp/50 hover:text-stamp transition-colors"
+              >
+                Cerrar sesión
+              </button>
             </div>
           </div>
         </header>
 
-        {/* Listado de mensajes */}
+        {/* Message list */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-ledger pr-1 space-y-5">
           {messages.map((m, i) => (
             <Message key={i} role={m.role} content={m.content} />
@@ -174,19 +216,20 @@ export default function App() {
           {loading && <TypingIndicator />}
         </div>
 
+        {/* Error global */}
         {error && (
-          <div className="mt-3 text-sm text-stamp border border-stamp/40 bg-stamp/5 rounded-sm px-3 py-2 font-body">
+          <div role="alert" className="mt-3 text-sm text-stamp border border-stamp/40 bg-stamp/5 rounded-sm px-3 py-2 font-body">
             {error}
           </div>
         )}
 
-        {/* Sugerencias rápidas, solo al inicio */}
+        {/* Quick suggestions, shown only at the start */}
         {messages.length === 1 && (
           <div className="flex flex-wrap gap-2 mt-4">
-            {SUGERENCIAS.map((s) => (
+            {SUGGESTIONS.map((s) => (
               <button
                 key={s}
-                onClick={() => enviarMensaje(s)}
+                onClick={() => sendMessage(s)}
                 className="text-xs font-body text-ledger border border-ledger/30 rounded-full px-3 py-1.5 hover:bg-ledger hover:text-paper transition-colors"
               >
                 {s}
@@ -195,29 +238,34 @@ export default function App() {
           </div>
         )}
 
-        {/* Input */}
-        <form onSubmit={handleSubmit} className="mt-4 flex items-end gap-2 border-t border-line pt-4">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                enviarMensaje(input)
-              }
-            }}
-            placeholder="Escribí tu consulta…"
-            rows={1}
-            className="flex-1 resize-none bg-white/60 border border-line rounded-md px-3 py-2.5 font-body text-[15px] text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-brass/50 focus:border-brass"
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="bg-ink text-paper font-body text-sm font-medium px-4 py-2.5 rounded-md disabled:opacity-30 disabled:cursor-not-allowed hover:bg-ledger transition-colors"
-          >
-            Enviar
-          </button>
-        </form>
+        {/* Input + acciones */}
+        <div className="mt-4 border-t border-line pt-4 space-y-2">
+          <form onSubmit={handleSubmit} className="flex items-end gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage(input)
+                }
+              }}
+              placeholder="Escribí tu consulta…"
+              rows={1}
+              className="flex-1 resize-none bg-white/60 border border-line rounded-md px-3 py-2.5 font-body text-[15px] text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-brass/50 focus:border-brass"
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="bg-ink text-paper font-body text-sm font-medium px-4 py-2.5 rounded-md disabled:opacity-30 disabled:cursor-not-allowed hover:bg-ledger transition-colors"
+            >
+              Enviar
+            </button>
+          </form>
+
+          {/* Botón de derivación manual */}
+        </div>
+
       </div>
     </div>
   )

@@ -24,44 +24,44 @@
 
 **Flujo de datos RAG:**
 ```
-Usuario pregunta
+User asks a question
     ↓
-agent/tools.py:buscar_en_documentos()
+agent/tools.py:search_documents()
     ↓
-rag/retriever.py:buscar_similar(query)
+rag/retriever.py:search_similar(query)
     ↓
-embed_query() → Google text-embedding-004 → vector(768)
+embed_query() → nomic-embed-text-v1_5 → vector(768)
     ↓
 supabase.rpc("match_documentos", {...})
     ↓
-Query PostgreSQL con similitud vectorial
+PostgreSQL vector similarity query
     ↓
-Retorna top-3 documentos más relevantes
+Returns top-3 most relevant documents
     ↓
-Agente incluye contexto en prompt al LLM
+Agent includes retrieved context in the LLM prompt
 ```
 
 ### 2. **Redis Cloud (Memoria a Largo Plazo)**
 
 | Componente | Propósito | Línea de Código | Estructura |
 |-----------|----------|-----------------|-----------|
-| Key-value `perfil:{cliente_id}` | Persistir tipo de contribuyente entre sesiones | `agent/memory.py:73-79` | `{"tipo_contribuyente": "monotributo"}` |
-| TTL: 7 días | Expiración automática de datos antiguos | `agent/memory.py:76` | setex(..., 86400*7) |
-| Backend configurable | Usar Redis o memoria RAM según MEMORY_BACKEND | `agent/memory.py:43-65` | "redis" \| "memory" |
+| Key-value `profile:{client_id}` | Persist taxpayer type between sessions | `agent/memory.py:73-79` | `{"taxpayer_type": "monotributo"}` |
+| TTL: 7 days | Automatic expiration of old data | `agent/memory.py:76` | setex(..., 86400*7) |
+| Configurable backend | Use Redis or in-memory according to MEMORY_BACKEND | `agent/memory.py:43-65` | "redis" \| "memory" |
 
 **Flujo de memoria:**
 ```
-Usuario: "Soy monotributista"
+User: "I am a monotributo taxpayer"
     ↓
 agent/core.py:_extract_and_save_profile()
     ↓
-memory.actualizar_tipo_contribuyente()
+memory.update_taxpayer_type()
     ↓
-Redis SET perfil:session-123 '{"tipo_contribuyente":"monotributo"}'
+Redis SET profile:session-123 '{"taxpayer_type":"monotributo"}'
     ↓
-(7 días después expira automáticamente)
+(7 days later it expires automatically)
     ↓
-Siguiente sesión: memory.obtener_perfil() → Recupera datos
+Next session: memory.get_profile() → retrieves data
 ```
 
 ### 3. **Frontend (React - sin BD)**
@@ -97,16 +97,16 @@ AGENT (core.py)
     └─ _parse_action() → Extrae tool name del output
         ↓
 TOOLS (tools.py)
-    ├─ buscar_en_documentos()
+    ├─ search_documents()
     │   ↓
     │   RAG (retriever.py)
-    │   ├─ embed_query() → Google embedding
-    │   ├─ buscar_similar() → RPC match_documentos en Supabase
-    │   └─ Retorna top-3 documentos
+    │   ├─ embed_query() → nomic embedding
+    │   ├─ search_similar() → RPC match_documentos in Supabase
+    │   └─ Returns top-3 documents
     │
-    ├─ consultar_vencimientos() → Tabla hardcodeada en tools.py
-    ├─ escalar_consulta() → Print + (TODO: webhook)
-    └─ obtener_fecha_hora() → datetime.now()
+    ├─ get_due_dates() → hardcoded table in tools.py
+    ├─ escalate_query() → Print + (TODO: webhook)
+    └─ get_current_datetime() → datetime.now()
         ↓
 MEMORY (memory.py)
     ├─ short_mem.add() → Agregar a historial sesión
@@ -193,7 +193,7 @@ TTL: 604800 segundos (7 días)
 
 ```env
 # API Keys
-GEMINI_API_KEY=xxx                       # Google AI Studio
+GROQ_API_KEY=xxx                         # Groq API key
 LANGFUSE_SECRET_KEY=sk-lf-xxx           # Observabilidad (opcional)
 LANGFUSE_PUBLIC_KEY=pk-lf-xxx           # Observabilidad (opcional)
 
@@ -205,8 +205,8 @@ SUPABASE_KEY=sb_xxx
 MEMORY_BACKEND=redis                     # "redis" | "memory"
 REDIS_URL=rediss://default:pwd@host:port
 
-# Gemini
-LLM_MODEL=gemini-3.5-flash              # Model actual
+# Groq
+LLM_MODEL=qwen/qwen3-32b       # Model actual
 
 # Configuración
 MAX_REACT_ITERATIONS=5
@@ -228,17 +228,17 @@ frontend/App.jsx
                     ├─→ _call_llm() → Google Gemini API
                     ├─→ _parse_action()
                     │
-                    └─→ ejecutar_tool() → agent/tools.py
+                        └─→ execute_tool() → agent/tools.py
                             │
-                            ├─→ buscar_en_documentos()
+                            ├─→ search_documents()
                             │   └─→ rag/retriever.py
-                            │       ├─→ embed_query() → Google API
-                            │       └─→ buscar_similar()
+                            │       ├─→ embed_query() → nomic API
+                            │       └─→ search_similar()
                             │           └─→ Supabase RPC match_documentos()
                             │
-                            ├─→ consultar_vencimientos()
-                            ├─→ escalar_consulta()
-                            └─→ obtener_fecha_hora()
+                            ├─→ get_due_dates()
+                            ├─→ escalate_query()
+                            └─→ get_current_datetime()
                     │
                     └─→ memory.py
                         ├─→ ShortTermMemory (en sesión)
@@ -390,6 +390,6 @@ SELECT * FROM public.documentos WHERE embedding IS NULL;
 ## 📚 Referencias Útiles
 
 - **Supabase pgvector**: https://supabase.com/docs/guides/database/extensions/pgvector
-- **Google Embeddings**: https://ai.google.dev/gemini-api/docs/embeddings
+- **Groq Embeddings**: https://groq.ai
 - **Similitud Coseno**: https://en.wikipedia.org/wiki/Cosine_similarity
 - **RLS en Supabase**: https://supabase.com/docs/guides/auth/row-level-security

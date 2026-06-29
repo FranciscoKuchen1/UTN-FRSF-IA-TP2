@@ -6,8 +6,8 @@ funcionales y **memoria** conversacional. Ver el informe técnico de la 1ª entr
 detalle conceptual completo (objetivo, percepciones/acciones, ambiente y arquitectura).
 
 Stack:
-- **Backend**: Python + FastAPI, agente ReAct sobre Gemini 2.0 Flash
-- **RAG**: Supabase pgvector + embeddings `text-embedding-004` (opcional)
+- **Backend**: Python + FastAPI, agente ReAct sobre Groq
+- **RAG**: Supabase pgvector + Groq embeddings
 - **Memoria**: corto plazo en context window; largo plazo (perfil del cliente) en **Redis Cloud** o en memoria de proceso
 - **Frontend**: React + Vite + Tailwind CSS
 - **Observabilidad**: Langfuse (opcional)
@@ -22,7 +22,7 @@ Stack:
 
 - Python 3.11+
 - Node.js 18+ y npm
-- Una API key de Gemini ([Google AI Studio](https://aistudio.google.com/apikey))
+- Una API key de Groq
 - **(Opcional)** Una database en Redis Cloud para persistencia (Upstash o Redis Cloud — ambas free)
 
 ---
@@ -32,8 +32,8 @@ Stack:
 ### 1. Descargar y preparar
 
 ```bash
-unzip UTN-FRSF-IA-TP2-sin-docker.zip
-cd UTN-FRSF-IA-TP2-sin-docker
+unzip UTN-FRSF-IA-TP2.zip
+cd UTN-FRSF-IA-TP2
 
 cp .env.example .env
 ```
@@ -43,7 +43,8 @@ cp .env.example .env
 Edita `.env` y completa **como mínimo**:
 
 ```env
-GEMINI_API_KEY=tu_api_key_aqui
+GROQ_API_KEY=tu_api_key_aqui
+LLM_MODEL=qwen/qwen3-32b
 MEMORY_BACKEND=memory
 ```
 
@@ -254,11 +255,13 @@ Si usas `MEMORY_BACKEND=redis`, intenta:
 
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
-| `GEMINI_API_KEY` | ✓ | API key de Google AI Studio |
+| `GROQ_API_KEY` | ✓ | API key de Groq |
 | `MEMORY_BACKEND` | ✓ | `memory` (desarrollo) o `redis` (producción) |
 | `REDIS_URL` | Si `MEMORY_BACKEND=redis` | URL de Redis Cloud (ej: `rediss://...`) |
 | `SUPABASE_URL` | Si usas RAG | URL del proyecto Supabase |
 | `SUPABASE_KEY` | Si usas RAG | Clave de Supabase |
+| `NOMIC_API_KEY` | Para busqueda semantica | API key de Nomic; sin ella se usa busqueda textual |
+| `ACCOUNTANT_WEBHOOK_URL` | Opcional | Webhook para notificar derivaciones; siempre queda una cola local |
 | `LANGFUSE_SECRET_KEY` | Opcional | Clave de observabilidad |
 | `LANGFUSE_PUBLIC_KEY` | Opcional | Clave de observabilidad |
 | `MAX_REACT_ITERATIONS` | No (default: 5) | Máximo de pasos del agente |
@@ -313,10 +316,13 @@ Si querés que el agente busque en documentos del estudio:
    ```env
    SUPABASE_URL=https://...
    SUPABASE_KEY=...
+   NOMIC_API_KEY=...  # necesario para generar embeddings al cargar archivos
    ```
 4. Carga documentos:
    ```bash
    python -m rag.ingest --file docs/calendario.pdf --source "Calendario AFIP"
+   python -m rag.ingest --file docs/guia.docx --source "Guia impositiva"
+   python -m rag.ingest --file docs/notas.txt --source "Notas internas"
    ```
 
 Ver `rag/ingest.py` para más detalles.
