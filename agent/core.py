@@ -262,6 +262,15 @@ class ReActAgent:
             return "Escribi una consulta para que pueda ayudarte."
 
         self._extract_and_save_profile(user_message)
+        
+        # Verificar si falta taxpayer_type
+        profile = self.long_mem.get_profile(self.client_id) or {}
+        if not profile.get("taxpayer_type"):
+            msg = "¡Hola! Antes de responder tu consulta, necesito que me digas tu condición fiscal (ej: Monotributista, Responsable Inscripto) para poder ayudarte de manera precisa."
+            self.short_mem.add("user", user_message)
+            self.short_mem.add("assistant", msg)
+            return msg
+
         self.short_mem.add("user", user_message)
 
         tools_desc = json.dumps(TOOLS_SCHEMA, ensure_ascii=False, indent=2)
@@ -350,6 +359,11 @@ class ReActAgent:
 
     def _extract_and_save_profile(self, user_msg: str):
         """Persist an explicitly stated or unambiguous taxpayer type."""
+        # Evitar sobrescribir si ya lo tenemos guardado
+        profile = self.long_mem.get_profile(self.client_id) or {}
+        if profile.get("taxpayer_type"):
+            return
+
         msg_lower = user_msg.lower()
         taxpayer_type = None
 
