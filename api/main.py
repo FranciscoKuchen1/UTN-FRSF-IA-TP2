@@ -433,6 +433,22 @@ async def reply_escalation(
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/admin/escalations/{ticket_id}", tags=["Admin"])
+async def delete_escalation(
+    ticket_id: str, 
+    admin_data=Depends(get_current_admin)
+):
+    """Elimina un ticket de derivación."""
+    try:
+        user_client = admin_data["client"]
+        res = user_client.table("escalations").delete().eq("id", ticket_id).execute()
+        if not res.data:
+            pass # Ignoramos si ya fue borrado
+        return {"status": "success", "message": "Ticket eliminado."}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/settings/contact", tags=["Settings"])
 async def get_contact_settings():
     """Obtiene la info de contacto del estudio."""

@@ -9,9 +9,9 @@ export default function EscalationPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // State for reply inputs
-  const [replies, setReplies] = useState({})
-  const [sending, setSending] = useState({})
+  // State for delete modal
+  const [ticketToDelete, setTicketToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     fetchEscalations()
@@ -32,39 +32,25 @@ export default function EscalationPanel() {
     }
   }
 
-  function handleReplyChange(id, text) {
-    setReplies(prev => ({ ...prev, [id]: text }))
-  }
-
-  async function handleSendReply(id) {
-    const text = replies[id]?.trim()
-    if (!text) return
-
-    setSending(prev => ({ ...prev, [id]: true }))
+  async function confirmDelete() {
+    if (!ticketToDelete) return
+    setIsDeleting(true)
+    
     try {
-      const res = await fetch(`${API_URL}/admin/escalations/${id}/reply`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: text })
+      const res = await fetch(`${API_URL}/admin/escalations/${ticketToDelete}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
       })
 
-      if (!res.ok) throw new Error('No se pudo enviar la respuesta')
+      if (!res.ok) throw new Error('No se pudo eliminar el ticket')
 
       // Remove from list
-      setEscalations(prev => prev.filter(e => e.id !== id))
-      // Clear reply state
-      setReplies(prev => {
-        const next = { ...prev }
-        delete next[id]
-        return next
-      })
+      setEscalations(prev => prev.filter(e => e.id !== ticketToDelete))
+      setTicketToDelete(null)
     } catch (err) {
       alert(err.message)
     } finally {
-      setSending(prev => ({ ...prev, [id]: false }))
+      setIsDeleting(false)
     }
   }
 
@@ -119,26 +105,50 @@ export default function EscalationPanel() {
               </div>
             </div>
 
-            <div className="mt-2">
-              <textarea
-                value={replies[esc.id] || ''}
-                onChange={(e) => handleReplyChange(esc.id, e.target.value)}
-                placeholder="Escribe la respuesta que recibirá el cliente..."
-                className="w-full h-24 p-3 border border-line rounded-md text-sm focus:outline-none focus:border-brass focus:ring-1 focus:ring-brass transition-colors resize-none"
-              />
-              <div className="flex justify-end mt-3">
-                <button
-                  onClick={() => handleSendReply(esc.id)}
-                  disabled={!replies[esc.id]?.trim() || sending[esc.id]}
-                  className="bg-ledger text-paper px-5 py-2 rounded font-medium text-sm disabled:opacity-50 hover:bg-ink transition-colors"
-                >
-                  {sending[esc.id] ? 'Enviando...' : 'Enviar Respuesta'}
-                </button>
-              </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setTicketToDelete(esc.id)}
+                className="flex items-center gap-2 bg-ledger/10 text-ledger px-4 py-2 rounded-md font-medium text-sm hover:bg-ledger/20 transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                Marcar como respondida
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 border border-line">
+            <h3 className="text-lg font-display font-semibold text-ink mb-2">
+              ¿Confirmar acción?
+            </h3>
+            <p className="text-sm text-ink/70 font-body mb-6">
+              Esta acción eliminará el ticket de la base de datos permanentemente. Asegurate de haberte comunicado con el cliente por tu cuenta antes de marcarla como respondida.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setTicketToDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium text-ink/60 hover:text-ink transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-medium bg-ledger text-paper rounded hover:bg-ink transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Eliminando...' : 'Sí, marcar y eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
