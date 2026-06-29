@@ -280,7 +280,7 @@ async def upload_document(
             detail="Formato no soportado. Usa PDF, DOCX o TXT.",
         )
 
-    max_upload_size = int(os.getenv("MAX_UPLOAD_SIZE_MB", "10")) * 1024 * 1024
+    max_upload_size = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50")) * 1024 * 1024
     contents = await file.read(max_upload_size + 1)
     if len(contents) > max_upload_size:
         raise HTTPException(status_code=413, detail="El archivo supera el tamano permitido.")
@@ -358,6 +358,26 @@ async def delete_document(filename: str, admin_data=Depends(get_current_admin)):
         return {"status": "success", "message": f"{filename} eliminado."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error eliminando documento: {str(e)}")
+
+
+@app.delete("/admin/documents", tags=["Admin"])
+async def delete_all_documents(admin_data=Depends(get_current_admin)):
+    """Elimina TODOS los documentos de Storage y sus chunks de la base de datos."""
+    try:
+        user_client = admin_data["client"]
+        
+        # Listar y eliminar todos los archivos de Storage
+        res = user_client.storage.from_("knowledge_base").list()
+        files = [f["name"] for f in res if f.get("name") and not f["name"].startswith(".empty")]
+        if files:
+            user_client.storage.from_("knowledge_base").remove(files)
+        
+        # Eliminar todos los registros de la base de datos documental
+        user_client.table("documentos").delete().neq("id", 0).execute()
+        
+        return {"status": "success", "message": "Todos los documentos han sido eliminados."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error eliminando documentos: {str(e)}")
 
 
 @app.get("/admin/escalations", response_model=list[EscalationResponse], tags=["Admin"])
