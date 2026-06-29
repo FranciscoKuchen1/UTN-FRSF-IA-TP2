@@ -231,6 +231,19 @@ async def chat(
     lo que garantiza que cada usuario solo accede a su propia sesión.
     """
     user_id = str(current_user.id)
+    conversation_id = body.conversation_id
+
+    # Si no hay conversación, creamos una nueva
+    if not conversation_id:
+        try:
+            title = body.message[:30] + ("..." if len(body.message) > 30 else "")
+            res_conv = _supabase.table("conversations").insert([
+                {"user_id": user_id, "title": title}
+            ]).execute()
+            if res_conv.data and len(res_conv.data) > 0:
+                conversation_id = res_conv.data[0]["id"]
+        except Exception as e:
+            print(f"[WARN] Error creando conversación: {e}")
 
     if user_id not in _agents:
         _agents[user_id] = ReActAgent(
@@ -245,10 +258,18 @@ async def chat(
         
         # Persistir la conversacion en Supabase
         try:
-            _supabase.table("chat_messages").insert([
-                {"user_id": user_id, "role": "user", "content": body.message},
-                {"user_id": user_id, "role": "assistant", "content": response}
-            ]).execute()
+            msg_data_user = {"user_id": user_id, "role": "user", "content": body.message}
+            msg_data_assistant = {"user_id": user_id, "role": "assistant", "content": response}
+            
+            if conversation_id:
+                msg_data_user["conversation_id"] = conversation_id
+                msg_data_assistant["conversation_id"] = conversation_id
+                
+            _supabase.table("chat_messages").insert([msg_data_user, msg_data_assistant]).execute()
+            
+            # Actualizar updated_at de la conversación
+            if conversation_id:
+                _supabase.table("conversations").update({"updated_at": "now()"}).eq("id", conversation_id).execute()
         except Exception as e:
             print(f"[WARN] Error guardando historial de chat: {e}")
 
@@ -258,17 +279,34 @@ async def chat(
     except Exception:
         raise HTTPException(status_code=500, detail="Error interno del agente.")
 
-    return ChatResponse(response=response, session_id=user_id)
+    return ChatResponse(response=response, session_id=user_id, conversation_id=conversation_id)
+
+@app.get("/chat/conversations", tags=["Chat"])
+async def get_conversations(current_user=Depends(get_current_user)):
+    """Obtiene las conversaciones del usuario."""
+    try:
+        res = _supabase.table("conversations")\
+            .select("id, title, created_at, updated_at")\
+            .eq("user_id", str(current_user.id))\
+            .order("updated_at", desc=True)\
+            .execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo conversaciones: {str(e)}")
+
 
 @app.get("/chat/history", tags=["Chat"])
-async def get_chat_history(current_user=Depends(get_current_user)):
+async def get_chat_history(conversation_id: str = None, current_user=Depends(get_current_user)):
     """Obtiene el historial de chat persistido del cliente."""
     try:
-        res = _supabase.table("chat_messages")\
+        query = _supabase.table("chat_messages")\
             .select("role,content,created_at")\
-            .eq("user_id", str(current_user.id))\
-            .order("created_at", desc=False)\
-            .execute()
+            .eq("user_id", str(current_user.id))
+        
+        if conversation_id:
+            query = query.eq("conversation_id", conversation_id)
+            
+        res = query.order("created_at", desc=False).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo historial: {str(e)}")
