@@ -1,5 +1,5 @@
 {
-   "reglas_generales": {
+  "reglas_generales": {
     "monotributo": {
       "descripcion": "Cuota mensual unificada (componente impositivo + previsional + obra social). Vence el día 20 de cada mes para todos los CUIT sin distinción.",
       "corrimientos_2026": {
@@ -60,9 +60,18 @@
     "ganancias_personas_humanas_pf2025": {
       "descripcion": "Declaración Jurada anual de Ganancias - Personas Humanas. Período fiscal 2025.",
       "presentacion_y_pago": {
-        "CUIT_0-1-2-3": { "presentacion": "2026-06-11", "pago": "2026-06-12" },
-        "CUIT_4-5-6": { "presentacion": "2026-06-12", "pago": "2026-06-15" },
-        "CUIT_7-8-9": { "presentacion": "2026-06-15", "pago": "2026-06-16" }
+        "CUIT_0-1-2-3": {
+          "presentacion": "2026-06-11",
+          "pago": "2026-06-12"
+        },
+        "CUIT_4-5-6": {
+          "presentacion": "2026-06-12",
+          "pago": "2026-06-15"
+        },
+        "CUIT_7-8-9": {
+          "presentacion": "2026-06-15",
+          "pago": "2026-06-16"
+        }
       }
     },
     "ganancias_sociedades_cierre_diciembre2025": {
@@ -76,14 +85,27 @@
     "bienes_personales_pf2025": {
       "descripcion": "Declaración Jurada anual de Bienes Personales. Período fiscal 2025.",
       "presentacion_y_pago": {
-        "CUIT_0-1-2-3": { "presentacion": "2026-06-11", "pago": "2026-06-12" },
-        "CUIT_4-5-6": { "presentacion": "2026-06-12", "pago": "2026-06-15" },
-        "CUIT_7-8-9": { "presentacion": "2026-06-15", "pago": "2026-06-16" }
+        "CUIT_0-1-2-3": {
+          "presentacion": "2026-06-11",
+          "pago": "2026-06-12"
+        },
+        "CUIT_4-5-6": {
+          "presentacion": "2026-06-12",
+          "pago": "2026-06-15"
+        },
+        "CUIT_7-8-9": {
+          "presentacion": "2026-06-15",
+          "pago": "2026-06-16"
+        }
       }
     },
     "ganancias_anticipos_2026": {
       "descripcion": "Anticipos del impuesto a las ganancias correspondientes al período fiscal 2026. Vencen los días 13 al 15 de cada mes según terminación de CUIT.",
-      "meses": ["agosto", "octubre", "diciembre"],
+      "meses": [
+        "agosto",
+        "octubre",
+        "diciembre"
+      ],
       "grupos": {
         "0-1-2": "Día 13 del mes",
         "3-4-5": "Día 14 del mes",
@@ -112,262 +134,537 @@
   },
   "calendario_mensual_2026": {
     "enero_2026": {
-      "monotributo": { "cuota_mensual": "2026-01-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-01-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-01-05", "4-5-6": "2026-01-06", "7-8-9": "2026-01-07",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-01-05",
+        "4-5-6": "2026-01-06",
+        "7-8-9": "2026-01-07",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_diciembre2025": {
-        "0-1": "2026-01-19", "2-3": "2026-01-20", "4-5": "2026-01-21",
-        "6-7": "2026-01-22", "8-9": "2026-01-23",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-01-19",
+        "2-3": "2026-01-20",
+        "4-5": "2026-01-21",
+        "6-7": "2026-01-22",
+        "8-9": "2026-01-23",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_diciembre2025": {
-        "0-1-2-3": "2026-01-09", "4-5-6": "2026-01-12", "7-8-9": "2026-01-13",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-01-09",
+        "4-5-6": "2026-01-12",
+        "7-8-9": "2026-01-13",
+        "aplica_a": [
+          "empleador"
+        ]
       }
     },
     "febrero_2026": {
-      "monotributo": { "cuota_mensual": "2026-02-20", "aplica_a": ["monotributista"] },
-      "recategorizacion_monotributo": { "vencimiento": "2026-02-05", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-02-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
+      "recategorizacion_monotributo": {
+        "vencimiento": "2026-02-05",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-02-05", "4-5-6": "2026-02-06", "7-8-9": "2026-02-07",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-02-05",
+        "4-5-6": "2026-02-06",
+        "7-8-9": "2026-02-07",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_enero2026": {
-        "0-1": "2026-02-18", "2-3": "2026-02-19", "4-5": "2026-02-20",
-        "6-7": "2026-02-23", "8-9": "2026-02-24",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-02-18",
+        "2-3": "2026-02-19",
+        "4-5": "2026-02-20",
+        "6-7": "2026-02-23",
+        "8-9": "2026-02-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_enero2026": {
-        "0-1-2-3": "2026-02-09", "4-5-6": "2026-02-10", "7-8-9": "2026-02-11",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-02-09",
+        "4-5-6": "2026-02-10",
+        "7-8-9": "2026-02-11",
+        "aplica_a": [
+          "empleador"
+        ]
       }
     },
     "marzo_2026": {
-      "monotributo": { "cuota_mensual": "2026-03-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-03-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-03-05", "4-5-6": "2026-03-06", "7-8-9": "2026-03-07",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-03-05",
+        "4-5-6": "2026-03-06",
+        "7-8-9": "2026-03-07",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_febrero2026": {
-        "0-1": "2026-03-18", "2-3": "2026-03-19", "4-5": "2026-03-20",
-        "6-7": "2026-03-23", "8-9": "2026-03-24",
-        "aplica_a": ["responsable_inscripto"],
+        "0-1": "2026-03-18",
+        "2-3": "2026-03-19",
+        "4-5": "2026-03-20",
+        "6-7": "2026-03-23",
+        "8-9": "2026-03-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ],
         "nota": "Verificar corrimientos por Semana Santa (Jueves y Viernes Santo son inhábiles en ARCA)"
       },
       "cargas_sociales_f931_periodo_febrero2026": {
-        "0-1-2-3": "2026-03-09", "4-5-6": "2026-03-10", "7-8-9": "2026-03-11",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-03-09",
+        "4-5-6": "2026-03-10",
+        "7-8-9": "2026-03-11",
+        "aplica_a": [
+          "empleador"
+        ]
       },
-      "siradig_vencimiento": { "fecha": "2026-03-31", "aplica_a": ["empleado_dependencia"] }
+      "siradig_vencimiento": {
+        "fecha": "2026-03-31",
+        "aplica_a": [
+          "empleado_dependencia"
+        ]
+      }
     },
     "abril_2026": {
-      "monotributo": { "cuota_mensual": "2026-04-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-04-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-04-06", "4-5-6": "2026-04-07", "7-8-9": "2026-04-08",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-04-06",
+        "4-5-6": "2026-04-07",
+        "7-8-9": "2026-04-08",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_marzo2026": {
-        "0-1": "2026-04-20", "2-3": "2026-04-21", "4-5": "2026-04-22",
-        "6-7": "2026-04-23", "8-9": "2026-04-24",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-04-20",
+        "2-3": "2026-04-21",
+        "4-5": "2026-04-22",
+        "6-7": "2026-04-23",
+        "8-9": "2026-04-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_marzo2026": {
-        "0-1-2-3": "2026-04-09", "4-5-6": "2026-04-10", "7-8-9": "2026-04-13",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-04-09",
+        "4-5-6": "2026-04-10",
+        "7-8-9": "2026-04-13",
+        "aplica_a": [
+          "empleador"
+        ]
       },
-      "casas_particulares_pago_obligatorio": { "fecha": "2026-04-10", "aplica_a": ["empleador_casas_particulares"] }
+      "casas_particulares_pago_obligatorio": {
+        "fecha": "2026-04-10",
+        "aplica_a": [
+          "empleador_casas_particulares"
+        ]
+      }
     },
     "mayo_2026": {
-      "monotributo": { "cuota_mensual": "2026-05-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-05-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-05-05", "4-5-6": "2026-05-06", "7-8-9": "2026-05-07",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-05-05",
+        "4-5-6": "2026-05-06",
+        "7-8-9": "2026-05-07",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_abril2026": {
-        "0-1": "2026-05-19", "2-3": "2026-05-20", "4-5": "2026-05-21",
-        "6-7": "2026-05-22", "8-9": "2026-05-23",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-05-19",
+        "2-3": "2026-05-20",
+        "4-5": "2026-05-21",
+        "6-7": "2026-05-22",
+        "8-9": "2026-05-23",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_abril2026": {
-        "0-1-2-3": "2026-05-11", "4-5-6": "2026-05-12", "7-8-9": "2026-05-13",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-05-11",
+        "4-5-6": "2026-05-12",
+        "7-8-9": "2026-05-13",
+        "aplica_a": [
+          "empleador"
+        ]
       },
       "ganancias_ddjj_sociedades_cierre_dic2025": {
-        "0-1-2-3": "2026-05-13", "4-5-6": "2026-05-14", "7-8-9": "2026-05-15",
-        "aplica_a": ["sociedad"]
+        "0-1-2-3": "2026-05-13",
+        "4-5-6": "2026-05-14",
+        "7-8-9": "2026-05-15",
+        "aplica_a": [
+          "sociedad"
+        ]
       }
     },
     "junio_2026": {
       "monotributo": {
         "cuota_mensual": "2026-06-22",
         "nota": "Corrimiento: 20/06 es feriado inamovible (Día de la Bandera)",
-        "aplica_a": ["monotributista"]
+        "aplica_a": [
+          "monotributista"
+        ]
       },
       "autonomos": {
-        "0-1-2-3": "2026-06-05", "4-5-6": "2026-06-08", "7-8-9": "2026-06-09",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-06-05",
+        "4-5-6": "2026-06-08",
+        "7-8-9": "2026-06-09",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_mayo2026": {
-        "0-1": "2026-06-18", "2-3": "2026-06-19", "4-5": "2026-06-23",
-        "6-7": "2026-06-24", "8-9": "2026-06-25",
-        "aplica_a": ["responsable_inscripto"],
+        "0-1": "2026-06-18",
+        "2-3": "2026-06-19",
+        "4-5": "2026-06-23",
+        "6-7": "2026-06-24",
+        "8-9": "2026-06-25",
+        "aplica_a": [
+          "responsable_inscripto"
+        ],
         "nota": "Las terminaciones 2 y 8 que caerían el 20/06 (feriado) se corren al día hábil siguiente"
       },
       "cargas_sociales_f931_periodo_mayo2026": {
-        "0-1-2-3": "2026-06-09", "4-5-6": "2026-06-10", "7-8-9": "2026-06-11",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-06-09",
+        "4-5-6": "2026-06-10",
+        "7-8-9": "2026-06-11",
+        "aplica_a": [
+          "empleador"
+        ]
       },
       "ganancias_ddjj_anual_pf2025_personas_humanas": {
-        "CUIT_0-1-2-3": { "presentacion": "2026-06-11", "pago": "2026-06-12" },
-        "CUIT_4-5-6": { "presentacion": "2026-06-12", "pago": "2026-06-15" },
-        "CUIT_7-8-9": { "presentacion": "2026-06-15", "pago": "2026-06-16" },
-        "aplica_a": ["autonomo", "responsable_inscripto"]
+        "CUIT_0-1-2-3": {
+          "presentacion": "2026-06-11",
+          "pago": "2026-06-12"
+        },
+        "CUIT_4-5-6": {
+          "presentacion": "2026-06-12",
+          "pago": "2026-06-15"
+        },
+        "CUIT_7-8-9": {
+          "presentacion": "2026-06-15",
+          "pago": "2026-06-16"
+        },
+        "aplica_a": [
+          "autonomo",
+          "responsable_inscripto"
+        ]
       },
       "bienes_personales_ddjj_anual_pf2025": {
-        "CUIT_0-1-2-3": { "presentacion": "2026-06-11", "pago": "2026-06-12" },
-        "CUIT_4-5-6": { "presentacion": "2026-06-12", "pago": "2026-06-15" },
-        "CUIT_7-8-9": { "presentacion": "2026-06-15", "pago": "2026-06-16" },
-        "aplica_a": ["autonomo", "responsable_inscripto", "monotributista"]
+        "CUIT_0-1-2-3": {
+          "presentacion": "2026-06-11",
+          "pago": "2026-06-12"
+        },
+        "CUIT_4-5-6": {
+          "presentacion": "2026-06-12",
+          "pago": "2026-06-15"
+        },
+        "CUIT_7-8-9": {
+          "presentacion": "2026-06-15",
+          "pago": "2026-06-16"
+        },
+        "aplica_a": [
+          "autonomo",
+          "responsable_inscripto",
+          "monotributista"
+        ]
       },
       "convenio_multilateral_ddjj_anual_cm05": {
         "fecha": "2026-06-30",
-        "aplica_a": ["responsable_inscripto", "sociedad"]
+        "aplica_a": [
+          "responsable_inscripto",
+          "sociedad"
+        ]
       },
       "ddjj_informativa_empleados_dependencia": {
         "fecha": "2026-06-30",
-        "aplica_a": ["empleado_dependencia"],
+        "aplica_a": [
+          "empleado_dependencia"
+        ],
         "nota": "Solo aplica a empleados con ingresos brutos 2025 superiores a $196.963.134,52"
       }
     },
     "julio_2026": {
-      "monotributo": { "cuota_mensual": "2026-07-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-07-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-07-06", "4-5-6": "2026-07-07", "7-8-9": "2026-07-08",
-        "aplica_a": ["autonomo"],
+        "0-1-2-3": "2026-07-06",
+        "4-5-6": "2026-07-07",
+        "7-8-9": "2026-07-08",
+        "aplica_a": [
+          "autonomo"
+        ],
         "nota": "El 9 de julio es feriado inamovible. No afecta directamente este vencimiento."
       },
       "iva_ddjj_periodo_junio2026": {
-        "0-1": "2026-07-20", "2-3": "2026-07-21", "4-5": "2026-07-22",
-        "6-7": "2026-07-23", "8-9": "2026-07-24",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-07-20",
+        "2-3": "2026-07-21",
+        "4-5": "2026-07-22",
+        "6-7": "2026-07-23",
+        "8-9": "2026-07-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_junio2026": {
-        "0-1-2-3": "2026-07-09", "4-5-6": "2026-07-10", "7-8-9": "2026-07-13",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-07-09",
+        "4-5-6": "2026-07-10",
+        "7-8-9": "2026-07-13",
+        "aplica_a": [
+          "empleador"
+        ]
       },
       "informacion_participaciones_societarias": {
-        "0-1-2-3": "2026-07-28", "4-5-6": "2026-07-29", "7-8-9": "2026-07-30",
-        "aplica_a": ["sociedad", "responsable_inscripto"]
+        "0-1-2-3": "2026-07-28",
+        "4-5-6": "2026-07-29",
+        "7-8-9": "2026-07-30",
+        "aplica_a": [
+          "sociedad",
+          "responsable_inscripto"
+        ]
       }
     },
     "agosto_2026": {
       "monotributo": {
         "cuota_mensual": "2026-08-20",
-        "aplica_a": ["monotributista"]
+        "aplica_a": [
+          "monotributista"
+        ]
       },
       "recategorizacion_monotributo": {
         "vencimiento": "2026-08-05",
         "nota": "Excepcionalmente en 2026 el plazo fue extendido hasta el 05/08",
-        "aplica_a": ["monotributista"]
+        "aplica_a": [
+          "monotributista"
+        ]
       },
       "autonomos": {
-        "0-1-2-3": "2026-08-05", "4-5-6": "2026-08-06", "7-8-9": "2026-08-07",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-08-05",
+        "4-5-6": "2026-08-06",
+        "7-8-9": "2026-08-07",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_julio2026": {
-        "0-1": "2026-08-18", "2-3": "2026-08-19", "4-5": "2026-08-20",
-        "6-7": "2026-08-21", "8-9": "2026-08-24",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-08-18",
+        "2-3": "2026-08-19",
+        "4-5": "2026-08-20",
+        "6-7": "2026-08-21",
+        "8-9": "2026-08-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_julio2026": {
-        "0-1-2-3": "2026-08-10", "4-5-6": "2026-08-11", "7-8-9": "2026-08-12",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-08-10",
+        "4-5-6": "2026-08-11",
+        "7-8-9": "2026-08-12",
+        "aplica_a": [
+          "empleador"
+        ]
       },
       "ganancias_anticipo_agosto2026": {
-        "0-1-2": "2026-08-13", "3-4-5": "2026-08-14", "6-7-8-9": "2026-08-17",
-        "aplica_a": ["autonomo", "responsable_inscripto"]
+        "0-1-2": "2026-08-13",
+        "3-4-5": "2026-08-14",
+        "6-7-8-9": "2026-08-17",
+        "aplica_a": [
+          "autonomo",
+          "responsable_inscripto"
+        ]
       }
     },
     "septiembre_2026": {
       "monotributo": {
         "cuota_mensual": "2026-09-21",
         "nota": "Corrimiento: 20/09 cae sábado",
-        "aplica_a": ["monotributista"]
+        "aplica_a": [
+          "monotributista"
+        ]
       },
       "autonomos": {
-        "0-1-2-3": "2026-09-07", "4-5-6": "2026-09-08", "7-8-9": "2026-09-09",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-09-07",
+        "4-5-6": "2026-09-08",
+        "7-8-9": "2026-09-09",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_agosto2026": {
-        "0-1": "2026-09-18", "2-3": "2026-09-21", "4-5": "2026-09-22",
-        "6-7": "2026-09-23", "8-9": "2026-09-24",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-09-18",
+        "2-3": "2026-09-21",
+        "4-5": "2026-09-22",
+        "6-7": "2026-09-23",
+        "8-9": "2026-09-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_agosto2026": {
-        "0-1-2-3": "2026-09-09", "4-5-6": "2026-09-10", "7-8-9": "2026-09-11",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-09-09",
+        "4-5-6": "2026-09-10",
+        "7-8-9": "2026-09-11",
+        "aplica_a": [
+          "empleador"
+        ]
       }
     },
     "octubre_2026": {
-      "monotributo": { "cuota_mensual": "2026-10-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-10-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-10-05", "4-5-6": "2026-10-06", "7-8-9": "2026-10-07",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-10-05",
+        "4-5-6": "2026-10-06",
+        "7-8-9": "2026-10-07",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_septiembre2026": {
-        "0-1": "2026-10-19", "2-3": "2026-10-20", "4-5": "2026-10-21",
-        "6-7": "2026-10-22", "8-9": "2026-10-23",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-10-19",
+        "2-3": "2026-10-20",
+        "4-5": "2026-10-21",
+        "6-7": "2026-10-22",
+        "8-9": "2026-10-23",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_septiembre2026": {
-        "0-1-2-3": "2026-10-09", "4-5-6": "2026-10-13", "7-8-9": "2026-10-14",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-10-09",
+        "4-5-6": "2026-10-13",
+        "7-8-9": "2026-10-14",
+        "aplica_a": [
+          "empleador"
+        ]
       },
       "ganancias_anticipo_octubre2026": {
-        "0-1-2": "2026-10-13", "3-4-5": "2026-10-14", "6-7-8-9": "2026-10-15",
-        "aplica_a": ["autonomo", "responsable_inscripto"]
+        "0-1-2": "2026-10-13",
+        "3-4-5": "2026-10-14",
+        "6-7-8-9": "2026-10-15",
+        "aplica_a": [
+          "autonomo",
+          "responsable_inscripto"
+        ]
       }
     },
     "noviembre_2026": {
-      "monotributo": { "cuota_mensual": "2026-11-20", "aplica_a": ["monotributista"] },
+      "monotributo": {
+        "cuota_mensual": "2026-11-20",
+        "aplica_a": [
+          "monotributista"
+        ]
+      },
       "autonomos": {
-        "0-1-2-3": "2026-11-05", "4-5-6": "2026-11-06", "7-8-9": "2026-11-09",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-11-05",
+        "4-5-6": "2026-11-06",
+        "7-8-9": "2026-11-09",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_octubre2026": {
-        "0-1": "2026-11-18", "2-3": "2026-11-19", "4-5": "2026-11-20",
-        "6-7": "2026-11-23", "8-9": "2026-11-24",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-11-18",
+        "2-3": "2026-11-19",
+        "4-5": "2026-11-20",
+        "6-7": "2026-11-23",
+        "8-9": "2026-11-24",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_octubre2026": {
-        "0-1-2-3": "2026-11-09", "4-5-6": "2026-11-10", "7-8-9": "2026-11-11",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-11-09",
+        "4-5-6": "2026-11-10",
+        "7-8-9": "2026-11-11",
+        "aplica_a": [
+          "empleador"
+        ]
       }
     },
     "diciembre_2026": {
       "monotributo": {
         "cuota_mensual": "2026-12-21",
         "nota": "Corrimiento: 20/12 cae domingo",
-        "aplica_a": ["monotributista"]
+        "aplica_a": [
+          "monotributista"
+        ]
       },
       "autonomos": {
-        "0-1-2-3": "2026-12-09", "4-5-6": "2026-12-10", "7-8-9": "2026-12-11",
-        "aplica_a": ["autonomo"]
+        "0-1-2-3": "2026-12-09",
+        "4-5-6": "2026-12-10",
+        "7-8-9": "2026-12-11",
+        "aplica_a": [
+          "autonomo"
+        ]
       },
       "iva_ddjj_periodo_noviembre2026": {
-        "0-1": "2026-12-18", "2-3": "2026-12-21", "4-5": "2026-12-22",
-        "6-7": "2026-12-23", "8-9": "2026-12-28",
-        "aplica_a": ["responsable_inscripto"]
+        "0-1": "2026-12-18",
+        "2-3": "2026-12-21",
+        "4-5": "2026-12-22",
+        "6-7": "2026-12-23",
+        "8-9": "2026-12-28",
+        "aplica_a": [
+          "responsable_inscripto"
+        ]
       },
       "cargas_sociales_f931_periodo_noviembre2026": {
-        "0-1-2-3": "2026-12-09", "4-5-6": "2026-12-10", "7-8-9": "2026-12-11",
-        "aplica_a": ["empleador"]
+        "0-1-2-3": "2026-12-09",
+        "4-5-6": "2026-12-10",
+        "7-8-9": "2026-12-11",
+        "aplica_a": [
+          "empleador"
+        ]
       },
       "ganancias_anticipo_diciembre2026": {
-        "0-1-2": "2026-12-14", "3-4-5": "2026-12-15", "6-7-8-9": "2026-12-16",
-        "aplica_a": ["autonomo", "responsable_inscripto"]
+        "0-1-2": "2026-12-14",
+        "3-4-5": "2026-12-15",
+        "6-7-8-9": "2026-12-16",
+        "aplica_a": [
+          "autonomo",
+          "responsable_inscripto"
+        ]
       }
     }
   },

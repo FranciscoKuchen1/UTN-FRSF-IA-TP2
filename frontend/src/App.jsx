@@ -12,8 +12,8 @@ function extraerFuente(texto) {
 }
 
 const SUGGESTIONS = [
-  '¿Cuándo vence mi declaración de IVA este mes?',
-  '¿Qué documentación necesito para inscribirme como responsable inscripto?',
+  '¿Cuándo puedo ser monotributista?',
+  '¿Debo inscribir a toda persona que  trabaja en mi negocio?',
   '¿En qué categoría de monotributo entro si facturo $15M al año?',
 ]
 
