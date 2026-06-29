@@ -32,15 +32,10 @@ class ChatRequest(BaseModel):
     Nota: 'session_id' fue eliminado. La identidad del usuario se extrae
     directamente del JWT validado por la dependencia get_current_user,
     de modo que el cliente solo necesita enviar su mensaje.
-<<<<<<< HEAD
     Se agregó 'conversation_id' opcional para agrupar en diferentes conversaciones.
     """
     message: str
     conversation_id: str | None = None
-=======
-    """
-    message: str
->>>>>>> 107ecc32707a82ca6c1a173fa8592ab6633bbfb7
 
 
 class ChatResponse(BaseModel):
@@ -48,10 +43,7 @@ class ChatResponse(BaseModel):
     response: str
     session_id: str     # user_id del JWT; útil para que el frontend
                         # pueda correlacionar mensajes en logs/debug
-<<<<<<< HEAD
     conversation_id: str | None = None
-=======
->>>>>>> 107ecc32707a82ca6c1a173fa8592ab6633bbfb7
 
 
 # ─── Escalations ─────────────────────────────────────────────────────────────
