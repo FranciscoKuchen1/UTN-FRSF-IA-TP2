@@ -440,8 +440,8 @@ async def delete_escalation(
 ):
     """Elimina un ticket de derivación."""
     try:
-        user_client = admin_data["client"]
-        res = user_client.table("escalations").delete().eq("id", ticket_id).execute()
+        # Usamos _supabase para bypassear RLS en DELETE
+        res = _supabase.table("escalations").delete().eq("id", ticket_id).execute()
         if not res.data:
             pass # Ignoramos si ya fue borrado
         return {"status": "success", "message": "Ticket eliminado."}
