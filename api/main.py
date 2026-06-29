@@ -272,7 +272,14 @@ async def upload_document(
     Sube un documento y lo procesa para el RAG.
     Requiere ser administrador.
     """
-    filename = Path(file.filename or "").name
+    import re
+    raw_filename = Path(file.filename or "documento").name
+    # Sanitizar: reemplaza caracteres no alfanuméricos (excepto punto y guion) por guiones bajos
+    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', raw_filename)
+    filename = re.sub(r'_+', '_', filename).strip('_')
+    if not filename:
+        filename = "documento"
+    
     extension = Path(filename).suffix.lower()
     if extension not in {".pdf", ".docx", ".txt"}:
         raise HTTPException(
@@ -298,7 +305,6 @@ async def upload_document(
         summary = ingest_document(temp_path, source_name=filename)
         
         # Subir a Supabase Storage
-        user_client = admin_data["client"]
         content_type = "application/pdf"
         if extension == ".docx":
             content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -306,7 +312,7 @@ async def upload_document(
             content_type = "text/plain"
             
         try:
-            user_client.storage.from_("knowledge_base").upload(
+            _supabase.storage.from_("knowledge_base").upload(
                 file=contents,
                 path=filename,
                 file_options={"content-type": content_type, "upsert": "true"}
@@ -334,8 +340,7 @@ async def upload_document(
 async def get_documents(admin_data=Depends(get_current_admin)):
     """Obtiene la lista de documentos en la base de conocimiento desde Storage."""
     try:
-        user_client = admin_data["client"]
-        res = user_client.storage.from_("knowledge_base").list()
+        res = _supabase.storage.from_("knowledge_base").list()
         # Filtramos posibles archivos ocultos o carpetas
         files = [f for f in res if f.get("name") and not f["name"].startswith(".empty")]
         return files
@@ -347,13 +352,11 @@ async def get_documents(admin_data=Depends(get_current_admin)):
 async def delete_document(filename: str, admin_data=Depends(get_current_admin)):
     """Elimina un documento de Storage y sus chunks de la base de datos."""
     try:
-        user_client = admin_data["client"]
-        
         # Eliminar de Storage
-        user_client.storage.from_("knowledge_base").remove([filename])
+        _supabase.storage.from_("knowledge_base").remove([filename])
         
         # Eliminar de BD (limpiar chunks)
-        user_client.table("documentos").delete().eq("source", filename).execute()
+        _supabase.table("documentos").delete().eq("source", filename).execute()
         
         return {"status": "success", "message": f"{filename} eliminado."}
     except Exception as e:
@@ -364,16 +367,14 @@ async def delete_document(filename: str, admin_data=Depends(get_current_admin)):
 async def delete_all_documents(admin_data=Depends(get_current_admin)):
     """Elimina TODOS los documentos de Storage y sus chunks de la base de datos."""
     try:
-        user_client = admin_data["client"]
-        
         # Listar y eliminar todos los archivos de Storage
-        res = user_client.storage.from_("knowledge_base").list()
+        res = _supabase.storage.from_("knowledge_base").list()
         files = [f["name"] for f in res if f.get("name") and not f["name"].startswith(".empty")]
         if files:
-            user_client.storage.from_("knowledge_base").remove(files)
+            _supabase.storage.from_("knowledge_base").remove(files)
         
         # Eliminar todos los registros de la base de datos documental
-        user_client.table("documentos").delete().neq("id", 0).execute()
+        _supabase.table("documentos").delete().neq("id", 0).execute()
         
         return {"status": "success", "message": "Todos los documentos han sido eliminados."}
     except Exception as e:

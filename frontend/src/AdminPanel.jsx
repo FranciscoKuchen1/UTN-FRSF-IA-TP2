@@ -65,7 +65,6 @@ export default function AdminPanel() {
 
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState([])
   const [dropError, setDropError] = useState(null)
   const [currentTab, setCurrentTab] = useState('upload')
 
@@ -79,9 +78,13 @@ export default function AdminPanel() {
     })
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setActiveDocuments(data)
+        if (Array.isArray(data)) {
+            setActiveDocuments(data)
+        } else {
+            setDropError("Error backend: " + JSON.stringify(data))
+        }
       })
-      .catch(console.error)
+      .catch(e => setDropError("Error red: " + e.message))
       .finally(() => setLoadingDocs(false))
   }, [token])
 
@@ -101,7 +104,6 @@ export default function AdminPanel() {
       })
       if (!res.ok) throw new Error('Error al eliminar')
       
-      setUploadedFiles(prev => prev.filter(f => f.name !== filename))
       fetchActiveDocuments()
     } catch (err) {
       alert(err.message)
@@ -118,7 +120,6 @@ export default function AdminPanel() {
       })
       if (!res.ok) throw new Error('Error al eliminar todos los documentos')
       
-      setUploadedFiles([])
       fetchActiveDocuments()
     } catch (err) {
       alert(err.message)
@@ -199,32 +200,16 @@ export default function AdminPanel() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setUploadedFiles(prev => [...prev, {
-          name: file.name,
-          size: formatBytes(file.size),
-          status: 'error',
-          error: data.detail || `Error ${res.status}`,
-        }])
+        alert(`Error: ${data.detail || res.status}`)
         return
       }
 
-      const data = await res.json()
-      setUploadedFiles(prev => [...prev, {
-        name: data.nombre ?? file.name,
-        size: formatBytes(file.size),
-        chunks: data.chunks_generados ?? '—',
-        status: 'ok',
-      }])
+      await res.json()
       
       fetchActiveDocuments()
 
     } catch {
-      setUploadedFiles(prev => [...prev, {
-        name: file.name,
-        size: formatBytes(file.size),
-        status: 'error',
-        error: 'No se pudo contactar al servidor.',
-      }])
+      alert('No se pudo contactar al servidor.')
     } finally {
       setUploading(false)
     }
@@ -367,25 +352,13 @@ export default function AdminPanel() {
                 </div>
               )}
 
-              {/* Listado de subidas */}
-              {uploadedFiles.length > 0 && (
-                <section>
-                  <h2 className="font-mono text-[11px] uppercase tracking-widest text-ink/50 mb-3">
-                    Documentos subidos en esta sesión
-                  </h2>
-                  <div className="flex flex-col gap-2">
-                    {uploadedFiles.map((item, i) => (
-                      <UploadedRow key={i} item={item} onDelete={handleDeleteDocument} />
-                    ))}
-                  </div>
-                </section>
-              )}
+
 
               {/* Documentos Activos en la Base de Conocimiento */}
               <section className="mt-8">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-mono text-[11px] uppercase tracking-widest text-ink/50">
-                    Base de Conocimiento Actual
+                    Archivos cargados
                   </h2>
                   <div className="flex gap-4">
                     <button onClick={handleDeleteAllDocuments} className="text-xs text-stamp hover:text-stamp/80 font-medium transition-colors">
